@@ -23,6 +23,25 @@
   --amber:#ffb740;--amber-dim:rgba(255,183,64,0.12);--red:#ff6b6b;
   --nav-h:64px;--safe-bottom:env(safe-area-inset-bottom,0px);
 }
+.eye-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;transition:color .15s,background .15s;-webkit-tap-highlight-color:transparent;}
+.eye-btn:active{background:var(--surface2);}
+.eye-btn svg{width:20px;height:20px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+.home-pat-row{display:flex;align-items:center;justify-content:center;gap:8px;}
+.pat-total-row{display:flex;align-items:center;justify-content:center;gap:10px;}
+.val-hidden{letter-spacing:.05em;}
+/* Privacidad: ocultar cifras sin borrar el valor real */
+.mask{display:none;font-family:'DM Mono',monospace;letter-spacing:.12em;}
+#app.privacy .home-pat-val,
+#app.privacy .pat-total-val,
+#app.privacy #activosList .mov-amount,
+#app.privacy .obj-txt,
+#app.privacy #patHistorial .mov-desc{display:none;}
+#app.privacy .mask{display:inline-block;}
+#app.privacy .mask-home{color:var(--green);font-size:30px;font-weight:500;}
+#app.privacy .mask-pat{color:var(--text);font-size:28px;font-weight:500;}
+#app.privacy .mask-amount{color:var(--green);}
+#app.privacy .mask-obj{color:var(--muted);}
+#app.privacy .mask-hist{color:var(--text);}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;overflow:hidden;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);}
 
@@ -234,7 +253,11 @@ select.input-field{-webkit-appearance:none;cursor:pointer;}
     </div>
     <div class="home-patrimonio">
       <div class="home-pat-label">Patrimonio total</div>
-      <div class="home-pat-val" id="homePatrimonio">0 €</div>
+      <div class="home-pat-row">
+        <div class="home-pat-val" id="homePatrimonio">0 €</div>
+        <span class="mask mask-home">•••••&nbsp;€</span>
+        <button class="eye-btn" id="eyeBtnHome" onclick="togglePrivacy()" aria-label="Mostrar/ocultar"></button>
+      </div>
     </div>
     <div class="home-cards">
       <button class="home-card" onclick="goTo('calculadora')">
@@ -401,18 +424,22 @@ select.input-field{-webkit-appearance:none;cursor:pointer;}
 
   <div class="pat-total-card">
     <div class="pat-total-label">Patrimonio total</div>
-    <div class="pat-total-val"><span class="sym">€</span><span id="patTotal">0,00</span></div>
+    <div class="pat-total-row">
+      <div class="pat-total-val"><span class="sym">€</span><span id="patTotal">0,00</span></div>
+      <span class="mask mask-pat">€ •••••</span>
+      <button class="eye-btn" id="eyeBtnPat" onclick="togglePrivacy()" aria-label="Mostrar/ocultar"></button>
+    </div>
   </div>
 
   <div class="section">
     <div class="section-label">Objetivos</div>
     <div class="card">
       <div class="obj-block">
-        <div class="obj-head"><span class="obj-name">🛡️ Colchón emergencia</span><span class="obj-txt" id="objColchonTxt">0 / 7.200 €</span></div>
+        <div class="obj-head"><span class="obj-name">🛡️ Colchón emergencia</span><span class="obj-txt" id="objColchonTxt">0 / 7.200 €</span><span class="mask mask-obj">••••</span></div>
         <div class="obj-track"><div class="obj-fill" id="objColchonBar" style="width:0%"></div></div>
       </div>
       <div class="obj-block">
-        <div class="obj-head"><span class="obj-name">🏠 Vivienda</span><span class="obj-txt" id="objViviendaTxt">0 / 28.500 €</span></div>
+        <div class="obj-head"><span class="obj-name">🏠 Vivienda</span><span class="obj-txt" id="objViviendaTxt">0 / 28.500 €</span><span class="mask mask-obj">••••</span></div>
         <div class="obj-track"><div class="obj-fill blue" id="objViviendaBar" style="width:0%"></div></div>
       </div>
     </div>
@@ -863,7 +890,7 @@ function renderPatrimonio(){
     h+='<div class="activo-row">';
     h+='<div class="mov-icon" style="font-size:17px">'+a.icon+'</div>';
     h+='<div class="mov-body"><div class="mov-desc">'+esc(a.nombre)+'</div><div class="mov-date">'+esc(a.sub)+'</div></div>';
-    h+='<div class="mov-amount pos">'+fmt(a.val)+'€</div>';
+    h+='<div class="mov-amount pos">'+fmt(a.val)+'€</div><span class="mask mask-amount">•••• €</span>';
     if(a.editable) h+='<button class="edit-btn" onclick="editActivo(\''+a.editable+'\')"><svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 3a2.85 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5z"/></svg></button>';
     else h+='<div style="width:30px"></div>';
     h+='</div>';
@@ -877,7 +904,7 @@ function renderPatrimonio(){
     let hh='';
     patState.historial.slice().reverse().slice(0,12).forEach(x=>{
       hh+='<div class="movement"><div class="mov-icon">📅</div>';
-      hh+='<div class="mov-body"><div class="mov-desc">Sueldo '+fmt0(x.sueldo)+'€ → invertido '+fmt0(x.invertido)+'€ · colchón '+fmt0(x.colchon)+'€</div>';
+      hh+='<div class="mov-body"><div class="mov-desc">Sueldo '+fmt0(x.sueldo)+'€ → invertido '+fmt0(x.invertido)+'€ · colchón '+fmt0(x.colchon)+'€</div><span class="mask mask-hist">•••• → •••• · ••••</span>';
       hh+='<div class="mov-date">'+fmtDate(x.date)+'</div></div></div>';
     });
     hist.innerHTML=hh;
@@ -1066,6 +1093,26 @@ setTimeout(()=>{ document.getElementById('splash').classList.add('hidden'); }, 1
 
 // ════════ BLOQUEO CON HUELLA (WebAuthn) ════════
 const LOCK_KEY = 'mystuff_lock_v1';
+const PRIVACY_KEY = 'mystuff_privacy_v1';
+
+// ── Privacidad (ojo): oculta patrimonio/inversiones y recuerda el estado ──
+let privacyOn = loadJSON(PRIVACY_KEY) === true;
+
+const EYE_OPEN = '<svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+
+function applyPrivacy(){
+  document.getElementById('app').classList.toggle('privacy', privacyOn);
+  const icon = privacyOn ? EYE_OFF : EYE_OPEN;
+  ['eyeBtnHome','eyeBtnPat'].forEach(id=>{ const b=document.getElementById(id); if(b) b.innerHTML=icon; });
+}
+function togglePrivacy(){
+  privacyOn = !privacyOn;
+  saveJSON(PRIVACY_KEY, privacyOn);
+  applyPrivacy();
+}
+applyPrivacy();
+
 
 function lockState(){ return loadJSON(LOCK_KEY) || { enabled:false, credId:null, pin:null }; }
 function saveLock(s){ saveJSON(LOCK_KEY, s); }
@@ -1120,6 +1167,8 @@ function desbloquear(){
 }
 
 async function intentarDesbloqueo(){
+  const s = lockState();
+  if(!s.credId){ document.getElementById('lockPinRow').style.display='flex'; return; }
   const ok = await verificarHuella();
   if(ok) desbloquear();
   else document.getElementById('lockPinRow').style.display='flex';
@@ -1133,17 +1182,17 @@ function probarPin(){
 }
 
 function configurarPin(){
-  const p1 = prompt('Elige un PIN de respaldo (4-8 dígitos):');
+  const p1 = prompt('Elige un PIN (4-8 dígitos):');
   if(!p1 || !/^\d{4,8}$/.test(p1)){ if(p1!==null) toast('PIN no válido (4-8 dígitos)'); return; }
   const p2 = prompt('Repite el PIN:');
   if(p1!==p2){ toast('No coinciden'); return; }
-  const s = lockState(); s.pin = p1; saveLock(s);
+  const s = lockState(); s.pin = p1; s.enabled = true; saveLock(s);
   renderLockSetting();
   toast('✓ PIN guardado');
 }
 
 async function desactivarBloqueo(){
-  if(!await uiConfirm('¿Desactivar el bloqueo por huella?','Desactivar')) return;
+  if(!await uiConfirm('¿Desactivar el bloqueo al abrir la app?','Desactivar')) return;
   saveLock({ enabled:false, credId:null, pin:null });
   renderLockSetting();
   toast('Bloqueo desactivado');
@@ -1153,20 +1202,34 @@ function renderLockSetting(){
   const s = lockState();
   const el = document.getElementById('lockSetting');
   if(!el) return;
-  if(s.enabled){
-    el.innerHTML = '<div class="mov-body"><div class="mov-desc">🔒 Bloqueo con huella activo</div><div class="mov-date">'+(s.pin?'PIN de respaldo configurado':'Sin PIN de respaldo — recomendado añadirlo')+'</div></div>'+
-      '<button class="btn-prov" style="background:var(--surface2);color:var(--text)" onclick="'+(s.pin?'desactivarBloqueo()':'configurarPin()')+'">'+(s.pin?'Desactivar':'Añadir PIN')+'</button>';
+  const metodos = [];
+  if(s.credId) metodos.push('huella/cara');
+  if(s.pin) metodos.push('PIN');
+  if(s.enabled && metodos.length){
+    el.innerHTML = '<div class="mov-body"><div class="mov-desc">🔒 Bloqueo activo</div>'+
+      '<div class="mov-date">Entrada con '+metodos.join(' + ')+'</div></div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">'+
+      (s.credId?'':'<button class="btn-prov" onclick="registrarHuella()">+ Huella</button>')+
+      (s.pin?'':'<button class="btn-prov" onclick="configurarPin()">+ PIN</button>')+
+      '<button class="btn-prov" style="background:var(--surface2);color:var(--text)" onclick="desactivarBloqueo()">Desactivar</button>'+
+      '</div>';
   } else {
-    el.innerHTML = '<div class="mov-body"><div class="mov-desc">🔓 Bloqueo desactivado</div><div class="mov-date">Pide la huella al abrir la app</div></div>'+
-      '<button class="btn-prov" onclick="registrarHuella()">Activar</button>';
+    el.innerHTML = '<div class="mov-body"><div class="mov-desc">🔓 Bloqueo desactivado</div>'+
+      '<div class="mov-date">Pide huella/cara o PIN al abrir</div></div>'+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">'+
+      '<button class="btn-prov" onclick="registrarHuella()">Huella</button>'+
+      '<button class="btn-prov" style="background:var(--surface2);color:var(--text)" onclick="configurarPin()">Solo PIN</button>'+
+      '</div>';
   }
 }
 
-// Al cargar: si el bloqueo está activo, mostrar pantalla de bloqueo
+// Al cargar: si el bloqueo está activo (huella o solo PIN), mostrar pantalla de bloqueo
 (function(){
   const s = lockState();
-  if(s.enabled && s.credId){
+  if(s.enabled && (s.credId || s.pin)){
     document.getElementById('lockScreen').classList.remove('hidden');
+    // Si no hay huella registrada, mostrar directamente el PIN
+    if(!s.credId){ document.getElementById('lockPinRow').style.display='flex'; }
   }
 })();
 
