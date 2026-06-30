@@ -323,17 +323,18 @@ select.input-field{-webkit-appearance:none;cursor:pointer;}
 
   <div class="section">
     <div class="card">
-      <div class="card-label">¿Cuánto quieres invertir?</div>
+      <div class="card-label">Reparto del disponible</div>
       <div class="invertir-grid">
         <div class="invertir-box">
           <div class="ib-label">📈 Invierto</div>
-          <input type="number" id="invertirInput" value="290" min="0" step="1" inputmode="decimal"/>
+          <div class="ib-val" id="resInvertir">0,00 €</div>
         </div>
         <div class="invertir-box colchon">
           <div class="ib-label">🛡️ Al colchón</div>
-          <div class="ib-val" id="resColchon">0,00 €</div>
+          <input type="number" id="colchonInput" value="0" min="0" step="1" inputmode="decimal"/>
         </div>
       </div>
+      <div class="confirm-hint" style="margin-top:8px">Pon lo que va al colchón (0 si este mes no aportas). El resto se invierte.</div>
     </div>
   </div>
 
@@ -667,7 +668,7 @@ function renderHome(){
 }
 
 // ════════ CALCULADORA ════════
-let calcInvertir = null; // user-chosen amount to invest
+let calcColchon = null; // cantidad elegida por el usuario para el colchón (resto = inversión)
 
 function calcDisponible(){
   const sueldo = parseFloat(document.getElementById('sueldoInput').value)||0;
@@ -675,18 +676,20 @@ function calcDisponible(){
 }
 
 function calcSueldoChanged(){
+  // por defecto: 0 al colchón → todo a inversión
+  if(calcColchon===null) calcColchon = 0;
   const disp = calcDisponible();
-  // por defecto: sugerir invertir todo lo disponible
-  calcInvertir = disp;
-  document.getElementById('invertirInput').value = Math.round(calcInvertir);
+  if(calcColchon > disp) calcColchon = disp;
+  document.getElementById('colchonInput').value = Math.round(calcColchon);
   calcRender();
 }
 
-function calcInvertirChanged(){
+function calcColchonChanged(){
   const disp = calcDisponible();
-  let v = parseFloat(document.getElementById('invertirInput').value)||0;
-  if(v > disp){ v = disp; document.getElementById('invertirInput').value = Math.round(v); }
-  calcInvertir = v;
+  let v = parseFloat(document.getElementById('colchonInput').value)||0;
+  if(v < 0) v = 0;
+  if(v > disp){ v = disp; document.getElementById('colchonInput').value = Math.round(v); }
+  calcColchon = v;
   calcRender();
 }
 
@@ -720,9 +723,10 @@ function fallbackCopy(text){
 function calcRender(){
   const sueldo = parseFloat(document.getElementById('sueldoInput').value)||0;
   const disp = calcDisponible();
-  if(calcInvertir===null) calcSueldoChanged();
-  const invertir = Math.min(calcInvertir||0, disp);
-  const colchon = disp - invertir;
+  if(calcColchon===null) calcSueldoChanged();
+  const colchon = Math.min(Math.max(calcColchon||0,0), disp);
+  const invertir = disp - colchon;
+  if((calcColchon||0) > disp){ calcColchon = disp; document.getElementById('colchonInput').value = Math.round(disp); }
 
   // Desglose sueldo
   document.getElementById('descGastos').textContent = '−'+fmt(settings.gastosFijos+settings.gastosVar)+' €';
@@ -730,8 +734,8 @@ function calcRender(){
   document.getElementById('descDisp').textContent = fmt(disp)+' €';
 
   // resumen invertir/colchón
-  document.getElementById('resColchon').textContent = fmt(colchon)+' €';
-  document.getElementById('invertirInput').max = Math.round(disp);
+  document.getElementById('resInvertir').textContent = fmt(invertir)+' €';
+  document.getElementById('colchonInput').max = Math.round(disp);
 
   // distribución
   const montos = calcDistribucion(invertir);
@@ -772,12 +776,25 @@ function calcRender(){
   document.getElementById('btnConfirmarMes').disabled = !(sueldo>0 && disp>0);
 }
 
-function confirmarMes(){
+async function confirmarMes(){
   const sueldo = parseFloat(document.getElementById('sueldoInput').value)||0;
   const disp = calcDisponible();
-  const invertir = Math.min(calcInvertir||0, disp);
-  const colchon = disp - invertir;
+  const colchon = Math.min(Math.max(calcColchon||0,0), disp);
+  const invertir = disp - colchon;
   const montos = calcDistribucion(invertir);
+
+  // Aviso si ya confirmaste este mes (evita duplicar el aporte)
+  const mk = monthKey();
+  const yaEste = patState.historial.filter(x=>x.mes===mk);
+  if(yaEste.length){
+    const ult = yaEste[yaEste.length-1];
+    const ok = await uiConfirm(
+      'Ya confirmaste '+MESES[new Date().getMonth()]+' '+new Date().getFullYear()+
+      ' (sueldo '+fmt0(ult.sueldo)+'€, invertido '+fmt0(ult.invertido)+'€). '+
+      'Si confirmas otra vez se SUMARÁ encima. ¿Seguro?',
+      'Confirmar igualmente');
+    if(!ok) return;
+  }
 
   // sumar al patrimonio
   patState.colchon += colchon;
@@ -1081,8 +1098,8 @@ async function resetData(){
 document.getElementById('btnContrib').addEventListener('click', provAdd);
 document.getElementById('btnAddExpense').addEventListener('click', provExpense);
 document.getElementById('expAmount').addEventListener('keydown',e=>{ if(e.key==='Enter') provExpense(); });
-document.getElementById('sueldoInput').addEventListener('input', calcSueldoChanged);
-document.getElementById('invertirInput').addEventListener('input', calcInvertirChanged);
+document.getElementById('sueldoInput').addEventListener('input', calcRender);
+document.getElementById('colchonInput').addEventListener('input', calcColchonChanged);
 document.getElementById('btnConfirmarMes').addEventListener('click', confirmarMes);
 
 provRender();
