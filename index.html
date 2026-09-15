@@ -186,6 +186,12 @@ select.input-field{-webkit-appearance:none;cursor:pointer;}
 .btn-reto-buy{flex:1;background:var(--green);color:#000;border:none;border-radius:10px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;}
 .btn-reto-back{flex:1;background:var(--surface2);color:var(--muted);border:.5px solid var(--border2);border-radius:10px;padding:11px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;cursor:pointer;transition:all .15s;}
 .btn-reto-back:active{color:var(--text);border-color:var(--border2);}
+.reto-aportaciones{margin-top:12px;padding-top:10px;border-top:.5px solid var(--border);display:flex;flex-direction:column;gap:2px;}
+.reto-ap{display:flex;align-items:center;gap:10px;padding:5px 0;}
+.reto-ap-date{flex:1;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+.reto-ap-amt{font-family:'DM Mono',monospace;font-size:12px;font-weight:500;color:var(--green);}
+.reto-ap-del{background:none;border:none;color:var(--dim);font-size:16px;cursor:pointer;padding:0 4px;line-height:1;transition:color .15s;}
+.reto-ap-del:active{color:var(--red);}
 .toast{position:fixed;bottom:calc(var(--nav-h) + var(--safe-bottom) + 10px);left:50%;transform:translateX(-50%) translateY(40px);background:var(--text);color:var(--bg);padding:10px 20px;border-radius:99px;font-size:13px;font-weight:500;opacity:0;transition:all .25s cubic-bezier(.4,0,.2,1);pointer-events:none;z-index:60;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis;}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
 
@@ -479,10 +485,10 @@ select.input-field{-webkit-appearance:none;cursor:pointer;}
 
   <div class="section">
     <div class="card" style="background:var(--green-dim);border-color:rgba(0,214,143,.25)">
-      <div style="font-size:12.5px;color:var(--muted);line-height:1.55">El dinero de los retos <b style="color:var(--text)">sale de tu colchón</b> en Trade Republic. No es dinero nuevo: reservas una parte de lo que ya tienes. El patrimonio total no cambia — solo baja cuando compras algo.</div>
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.55">Cada reto es una meta de ahorro dentro de <b style="color:var(--text)">Trade Republic</b>. Añade lo que quieras cada mes. Es un seguimiento aparte: no suma ni resta a tu patrimonio, porque ese dinero ya está contado en tu colchón de TR.</div>
       <div style="display:flex;justify-content:space-between;margin-top:12px;padding-top:12px;border-top:.5px solid var(--border)">
-        <span style="font-size:12px;color:var(--muted)">Colchón libre para reservar</span>
-        <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--green)" id="colchonLibre">0 €</span>
+        <span style="font-size:12px;color:var(--muted)">Total ahorrado en retos</span>
+        <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--green)" id="retosResumen">0 €</span>
       </div>
     </div>
   </div>
@@ -599,8 +605,7 @@ function patTotal(){
   const provBalance = provState.movements.reduce((s,m)=>s+(m.type==='in'?m.amount:-m.amount),0);
   const f=patState.fondos;
   const vF=(x)=>x.valorReal!=null?x.valorReal:x.aportado;
-  const retosTotal=(patState.retos||[]).reduce((s,r)=>s+(r.ahorrado||0),0);
-  return patState.colchon + retosTotal + provBalance + vF(f.vivienda) + vF(f.sp500) + vF(f.msci);
+  return patState.colchon + provBalance + vF(f.vivienda) + vF(f.sp500) + vF(f.msci);
 }
 function renderHome(){
   document.getElementById('homePatrimonio').textContent = fmt0(patTotal()) + ' €';
@@ -823,8 +828,7 @@ function renderPatrimonio(){
   const provBalance = provState.movements.reduce((s,m)=>s+(m.type==='in'?m.amount:-m.amount),0);
   const f=patState.fondos;
   const vF=(x)=>x.valorReal!=null?x.valorReal:x.aportado;
-  const retosTotal=(patState.retos||[]).reduce((s,r)=>s+(r.ahorrado||0),0);
-  const total = patState.colchon + retosTotal + provBalance + vF(f.vivienda) + vF(f.sp500) + vF(f.msci);
+  const total = patState.colchon + provBalance + vF(f.vivienda) + vF(f.sp500) + vF(f.msci);
 
   document.getElementById('patTotal').textContent = fmt(total);
 
@@ -838,15 +842,12 @@ function renderPatrimonio(){
 
   // activos
   const activos = [
-    { id:'colchon', icon:'🛡️', nombre:'Colchón libre', sub:'Trade Republic', val:patState.colchon, editable:'colchon' },
-  ];
-  if(retosTotal>0) activos.push({ id:'retos', icon:'🎯', nombre:'Reservado en retos', sub:(patState.retos.length)+' reto(s) · dentro de TR', val:retosTotal, editable:null });
-  activos.push(
+    { id:'colchon', icon:'🛡️', nombre:'Colchón emergencia', sub:'Trade Republic', val:patState.colchon, editable:'colchon' },
     { id:'prov', icon:'📦', nombre:'Provisiones', sub:'Trade Republic · auto', val:provBalance, editable:null },
     { id:'vivienda', icon:'🏠', nombre:'Fondo monetario', sub:'Aportado: '+fmt0(f.vivienda.aportado)+' €', val:vF(f.vivienda), editable:'vivienda' },
     { id:'sp500', icon:'📈', nombre:'S&P 500', sub:'Aportado: '+fmt0(f.sp500.aportado)+' €', val:vF(f.sp500), editable:'sp500' },
     { id:'msci', icon:'🌍', nombre:'MSCI World', sub:'Aportado: '+fmt0(f.msci.aportado)+' €', val:vF(f.msci), editable:'msci' }
-  );
+  ];
 
   let h='';
   activos.forEach(a=>{
@@ -890,32 +891,43 @@ function editActivo(key){
 // ════════ RETOS ════════
 const RETO_EMOJIS = ['💻','📱','🎮','✈️','🎧','📷','⌚','🚗','🏍️','🎸','🛋️','🎁','🏖️','🎯'];
 
+function retoAhorrado(r){ return (r.aportaciones||[]).reduce((s,a)=>s+a.amount,0); }
+
 function renderRetos(){
-  document.getElementById('colchonLibre').textContent = fmt0(patState.colchon)+' €';
-  const list=document.getElementById('retosList');
   const retos=patState.retos||[];
-  if(!retos.length){ list.innerHTML='<div class="card"><div class="empty">Aún no tienes retos. Crea uno para empezar a reservar.</div></div>'; return; }
+  const totalReservado = retos.reduce((s,r)=>s+retoAhorrado(r),0);
+  document.getElementById('retosResumen').textContent = fmt0(totalReservado)+' €';
+  const list=document.getElementById('retosList');
+  if(!retos.length){ list.innerHTML='<div class="card"><div class="empty">Aún no tienes retos. Crea uno para empezar a ahorrar hacia una meta.</div></div>'; return; }
   let h='';
   retos.forEach(r=>{
-    const pct = r.objetivo>0 ? Math.min(r.ahorrado/r.objetivo*100,100) : 0;
-    const done = r.ahorrado>=r.objetivo && r.objetivo>0;
+    const ahorrado=retoAhorrado(r);
+    const pct = r.objetivo>0 ? Math.min(ahorrado/r.objetivo*100,100) : 0;
+    const done = ahorrado>=r.objetivo && r.objetivo>0;
     h+='<div class="card reto-card">';
     h+='<div class="reto-head"><div class="reto-icon">'+r.icon+'</div>';
     h+='<div class="reto-info"><div class="reto-name">'+esc(r.nombre)+'</div>';
-    h+='<div class="reto-nums">'+fmt0(r.ahorrado)+' / '+fmt0(r.objetivo)+' € · '+Math.round(pct)+'%</div></div>';
+    h+='<div class="reto-nums">'+fmt0(ahorrado)+' / '+fmt0(r.objetivo)+' € · '+Math.round(pct)+'%</div></div>';
     h+='<button class="reto-mini" onclick="editarReto(\''+r.id+'\')"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 3a2.85 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5z"/></svg></button>';
     h+='<button class="reto-mini" onclick="borrarReto(\''+r.id+'\')"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>';
     h+='</div>';
     h+='<div class="obj-track" style="margin-top:12px"><div class="obj-fill'+(done?'':' blue')+'" style="width:'+pct+'%"></div></div>';
-    if(done){
-      h+='<div class="reto-done">🎉 ¡Objetivo conseguido!</div>';
-      h+='<div class="reto-actions"><button class="btn-reto-buy" onclick="completarReto(\''+r.id+'\',\'comprado\')">Comprado</button>';
-      h+='<button class="btn-reto-back" onclick="completarReto(\''+r.id+'\',\'devolver\')">Devolver al colchón</button></div>';
-    } else {
-      h+='<div class="reto-actions"><button class="btn-reto-add" onclick="anadirAReto(\''+r.id+'\')">+ Reservar dinero</button>';
-      if(r.ahorrado>0) h+='<button class="btn-reto-back" onclick="completarReto(\''+r.id+'\',\'devolver\')">Devolver al colchón</button>';
+    if(done) h+='<div class="reto-done">🎉 ¡Objetivo conseguido!</div>';
+
+    // lista de aportaciones (para poder borrar solo una)
+    if((r.aportaciones||[]).length){
+      h+='<div class="reto-aportaciones">';
+      r.aportaciones.slice().reverse().forEach(a=>{
+        h+='<div class="reto-ap"><span class="reto-ap-date">'+fmtDate(a.date)+'</span>';
+        h+='<span class="reto-ap-amt">+'+fmt0(a.amount)+' €</span>';
+        h+='<button class="reto-ap-del" onclick="borrarAportacion(\''+r.id+'\',\''+a.id+'\')">×</button></div>';
+      });
       h+='</div>';
     }
+
+    h+='<div class="reto-actions"><button class="btn-reto-add" onclick="anadirAReto(\''+r.id+'\')">+ Añadir dinero</button>';
+    if(done) h+='<button class="btn-reto-buy" onclick="completarReto(\''+r.id+'\')">Comprado</button>';
+    h+='</div>';
     h+='</div>';
   });
   list.innerHTML=h;
@@ -933,23 +945,27 @@ function nuevoReto(){
     nombre:nombre.trim(),
     icon:(emoji&&emoji.trim())?emoji.trim():'🎯',
     objetivo:objNum,
-    ahorrado:0,
+    aportaciones:[],
   });
-  saveAll(); renderRetos(); renderHome(); toast('✓ Reto creado');
+  saveAll(); renderRetos(); toast('✓ Reto creado');
 }
 
 function anadirAReto(id){
   const r=patState.retos.find(x=>x.id===id); if(!r) return;
-  if(patState.colchon<=0){ toast('No tienes colchón libre para reservar'); return; }
-  const falta = r.objetivo - r.ahorrado;
-  const v = prompt('¿Cuánto reservas para "'+r.nombre+'"?\nColchón libre: '+fmt0(patState.colchon)+' € · Falta: '+fmt0(falta)+' €', Math.min(Math.round(patState.colchon), Math.round(falta)));
-  if(v===null) return;
-  let num = parseFloat(String(v).replace(',','.'));
+  const falta = r.objetivo - retoAhorrado(r);
+  const v = prompt('¿Cuánto añades a "'+r.nombre+'" este mes?'+(falta>0?'\nFalta: '+fmt0(falta)+' €':''), '');
+  if(v===null || v==='') return;
+  const num = parseFloat(String(v).replace(',','.'));
   if(isNaN(num)||num<=0){ toast('Importe no válido'); return; }
-  if(num>patState.colchon){ num=patState.colchon; toast('Ajustado a tu colchón libre'); }
-  patState.colchon -= num;
-  r.ahorrado += num;
-  saveAll(); renderRetos(); renderHome(); toast('✓ '+fmt0(num)+' € reservados');
+  if(!r.aportaciones) r.aportaciones=[];
+  r.aportaciones.push({ id:'ap_'+Date.now(), amount:num, date:new Date().toISOString() });
+  saveAll(); renderRetos(); toast('✓ +'+fmt0(num)+' € añadidos');
+}
+
+function borrarAportacion(retoId, apId){
+  const r=patState.retos.find(x=>x.id===retoId); if(!r) return;
+  r.aportaciones = r.aportaciones.filter(a=>a.id!==apId);
+  saveAll(); renderRetos(); toast('Aportación eliminada');
 }
 
 function editarReto(id){
@@ -961,33 +977,21 @@ function editarReto(id){
   if(obj!==null){ const n=parseFloat(String(obj).replace(',','.')); if(!isNaN(n)&&n>0) r.objetivo=n; }
   const emoji = prompt('Emoji:', r.icon);
   if(emoji!==null && emoji.trim()) r.icon=emoji.trim();
-  saveAll(); renderRetos(); renderHome(); toast('✓ Reto actualizado');
+  saveAll(); renderRetos(); toast('✓ Reto actualizado');
 }
 
 function borrarReto(id){
   const r=patState.retos.find(x=>x.id===id); if(!r) return;
-  const msg = r.ahorrado>0
-    ? 'Borrar "'+r.nombre+'". Sus '+fmt0(r.ahorrado)+' € reservados volverán a tu colchón. ¿Seguro?'
-    : 'Borrar "'+r.nombre+'". ¿Seguro?';
-  if(!confirm(msg)) return;
-  if(r.ahorrado>0) patState.colchon += r.ahorrado; // el dinero vuelve al colchón, no se pierde
+  if(!confirm('¿Borrar el reto "'+r.nombre+'" entero? Se perderá su seguimiento.')) return;
   patState.retos = patState.retos.filter(x=>x.id!==id);
-  saveAll(); renderRetos(); renderHome(); toast('Reto borrado');
+  saveAll(); renderRetos(); toast('Reto borrado');
 }
 
-function completarReto(id, modo){
+function completarReto(id){
   const r=patState.retos.find(x=>x.id===id); if(!r) return;
-  if(modo==='comprado'){
-    if(!confirm('¿Marcar "'+r.nombre+'" como comprado? Saldrán '+fmt0(r.ahorrado)+' € de tu patrimonio.')) return;
-    // el dinero se gasta: no vuelve al colchón, el reto desaparece
-    patState.retos = patState.retos.filter(x=>x.id!==id);
-    saveAll(); renderRetos(); renderHome(); toast('🎉 ¡Disfrútalo!');
-  } else {
-    if(!confirm('Devolver '+fmt0(r.ahorrado)+' € de "'+r.nombre+'" a tu colchón?')) return;
-    patState.colchon += r.ahorrado;
-    patState.retos = patState.retos.filter(x=>x.id!==id);
-    saveAll(); renderRetos(); renderHome(); toast('✓ Dinero de vuelta al colchón');
-  }
+  if(!confirm('¿Marcar "'+r.nombre+'" como comprado? Se cerrará el reto.\n\nRecuerda ajustar tu colchón en Patrimonio si el dinero ha salido de TR.')) return;
+  patState.retos = patState.retos.filter(x=>x.id!==id);
+  saveAll(); renderRetos(); toast('🎉 ¡Disfrútalo!');
 }
 
 // ════════ AJUSTES ════════
