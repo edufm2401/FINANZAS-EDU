@@ -103,6 +103,10 @@ nav{position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav-h) + var(--safe
 .calc-fondo-amount input{font-family:'Space Grotesk','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--green);background:transparent;border:none;outline:none;width:54px;text-align:right;-moz-appearance:textfield;}
 .calc-fondo-amount input::-webkit-outer-spin-button,.calc-fondo-amount input::-webkit-inner-spin-button{-webkit-appearance:none;}
 .calc-fondo-amount span{font-family:'Space Grotesk','Inter',sans-serif;font-size:12px;color:var(--muted);}
+.sinasignar-row{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
+.sa-lbl{font-size:13px;color:var(--muted);}
+.sa-val{font-family:'Space Grotesk','Inter',sans-serif;font-size:15px;font-weight:600;color:var(--text);}
+.sinasignar-row.over .sa-val{color:var(--red);}
 .p-pct{font-size:11px;color:var(--muted);margin-top:1px;}
 
 .alert-box{font-size:13px;color:var(--amber);background:var(--amber-dim);border-radius:10px;padding:10px 12px;margin-top:10px;line-height:1.5;}
@@ -206,6 +210,8 @@ select.input-field{-webkit-appearance:none;cursor:pointer;}
 .fondo-nombre:focus{border-color:var(--green);}
 .fondo-edit-row{display:flex;gap:8px;align-items:center;}
 .fondo-isin{flex:1;background:var(--bg);border:.5px solid var(--border2);border-radius:8px;padding:9px 10px;font-family:'Space Grotesk','Inter',sans-serif;font-size:12px;color:var(--text);outline:none;}
+.fondo-tipo{flex:1;background:var(--bg);border:.5px solid var(--border2);border-radius:8px;padding:9px 10px;font-family:'Inter',sans-serif;font-size:13px;color:var(--text);outline:none;-webkit-appearance:none;appearance:none;cursor:pointer;}
+.fondo-tipo:focus{border-color:var(--green);}
 .fondo-isin:focus{border-color:var(--green);}
 .fondo-pct{background:none;border:none;outline:none;font-family:'Space Grotesk','Inter',sans-serif;font-size:14px;font-weight:500;color:var(--text);}
 .fondo-suma{font-size:12px;color:var(--muted);text-align:center;margin-top:12px;padding-top:10px;border-top:.5px solid var(--border);}
@@ -450,32 +456,21 @@ nav{background:rgba(10,11,13,0.8);backdrop-filter:blur(24px) saturate(1.2);-webk
 
   <div class="section">
     <div class="card">
-      <div class="card-label">¿Cuánto quieres invertir?</div>
-      <div class="invertir-grid">
-        <div class="invertir-box">
-          <div class="ib-label">📈 Invierto</div>
-          <input type="number" id="invertirInput" value="290" min="0" step="1" inputmode="decimal"/>
-        </div>
-        <div class="invertir-box colchon">
-          <div class="ib-label">🏦 A TR / ahorro</div>
-          <div class="ib-val" id="resColchon">0,00 €</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="card">
-      <div class="card-label">Distribución · edita el € de cada fondo · toca el ISIN para copiarlo</div>
+      <div class="card-label">Reparte tu disponible entre tus destinos · edita el € de cada uno</div>
       <div class="bar-track" id="calcBarra"></div>
       <div id="calcPartidas"></div>
+      <div class="sinasignar-row" id="sinAsignarRow">
+        <span class="sa-lbl">Sin asignar</span>
+        <span class="sa-val" id="sinAsignar">0,00 €</span>
+      </div>
       <div id="calcAviso"></div>
+      <button class="btn-secondary" style="width:100%;margin-top:12px" onclick="goTo('ajustes')">+ Gestionar destinos (añadir / quitar)</button>
     </div>
   </div>
 
   <div class="section">
     <button class="btn-confirm" id="btnConfirmarMes">Confirmar mes → sumar al patrimonio</button>
-    <div class="confirm-hint">Al confirmar, lo invertido se suma a cada fondo y el resto a tu saldo de Trade Republic, en Patrimonio</div>
+    <div class="confirm-hint">Al confirmar, lo que pongas en cada destino se suma a su valor en Patrimonio</div>
   </div>
 </div>
 
@@ -596,7 +591,7 @@ nav{background:rgba(10,11,13,0.8);backdrop-filter:blur(24px) saturate(1.2);-webk
   </div>
 
   <div class="section">
-    <div class="section-label">Fondos de inversión · nombre, ISIN y % editables</div>
+    <div class="section-label">Destinos · dónde dejas tu dinero (TR, fondos…) · nombre, ISIN y % editables</div>
     <div class="card" id="fondosEditor"></div>
   </div>
 
@@ -705,9 +700,9 @@ const DEFAULT_SETTINGS = {
   objVivienda: 28500,
   invBase: 290,
   fondos: [
-    { key:'vivienda', nombre:'Vivienda — fondo monetario', isin:'FR0013289022', color:'#00d68f', pct:52 },
-    { key:'sp500',    nombre:'S&P 500 — jubilación',        isin:'IE0032126645', color:'#4d9fff', pct:29 },
-    { key:'msci',     nombre:'MSCI World — jubilación',     isin:'IE000ZYRH0Q7', color:'#9b8fff', pct:19 },
+    { key:'vivienda', nombre:'Vivienda — fondo monetario', isin:'FR0013289022', color:'#00d68f', pct:52, tipo:'fondo' },
+    { key:'sp500',    nombre:'S&P 500 — jubilación',        isin:'IE0032126645', color:'#4d9fff', pct:29, tipo:'fondo' },
+    { key:'msci',     nombre:'MSCI World — jubilación',     isin:'IE000ZYRH0Q7', color:'#9b8fff', pct:19, tipo:'fondo' },
   ],
 };
 
@@ -745,12 +740,45 @@ if(patState.trTotal===undefined){
   const _prov = (provState.movements||[]).reduce((s,m)=>s+(m.type==='in'?m.amount:-m.amount),0);
   patState.trTotal = (patState.colchon||0) + _prov;
 }
+// migración a "destinos": TR pasa a ser un destino más de la lista, no un campo aparte
+if(!settings.destinosMigrado){
+  settings.destinosMigrado = true;
+  // marcar rol/tipo en los fondos existentes
+  (settings.fondos||[]).forEach(f=>{
+    if(f.key==='vivienda' && !f.rol) f.rol='vivienda';
+    if(!f.tipo) f.tipo='fondo';
+  });
+  // ¿ya hay un destino de ahorro/TR? si no, crearlo
+  const yaTR = (settings.fondos||[]).some(f=>f.rol==='ahorro');
+  if(!yaTR){
+    const trKey='trade_republic';
+    const pesoFondos=(settings.fondos||[]).reduce((s,f)=>s+(f.pct||0),0)||100;
+    settings.fondos = settings.fondos||[];
+    settings.fondos.unshift({ key:trKey, nombre:'Trade Republic', isin:'', color:'#34e0a1', pct:pesoFondos, rol:'ahorro', tipo:'ahorro' });
+    // su valor acumulado = lo que había en trTotal
+    patState.fondos[trKey] = { aportado:0, valorReal: (patState.trTotal||0) };
+  }
+}
+// asegurar tipo en cualquier destino que no lo tenga
+(settings.fondos||[]).forEach(f=>{ if(!f.tipo) f.tipo = (f.isin&&f.isin.trim())?'fondo':'ahorro'; });
 
 function loadJSON(k){ try{ const r=localStorage.getItem(k); return r?JSON.parse(r):null; }catch(e){ return null; } }
 function saveJSON(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
 function saveAll(){ saveJSON(KEYS.settings,settings); saveJSON(KEYS.prov,provState); saveJSON(KEYS.pat,patState); }
 
 // ════════ HELPERS ════════
+// tipos de destino donde puedes dejar tu dinero
+const TIPOS = [
+  { id:'ahorro',   label:'Cuenta de ahorro', icon:'🏦', usaIsin:false },
+  { id:'fondo',    label:'Fondo / indexado', icon:'📊', usaIsin:true  },
+  { id:'acciones', label:'Acciones',          icon:'📈', usaIsin:true  },
+  { id:'crypto',   label:'Cripto',            icon:'🪙', usaIsin:false },
+  { id:'pension',  label:'Plan de pensiones', icon:'🏛️', usaIsin:true  },
+  { id:'corriente',label:'Cuenta corriente',  icon:'💳', usaIsin:false },
+  { id:'otro',     label:'Otro',              icon:'📦', usaIsin:false },
+];
+function tipoDe(f){ return TIPOS.find(t=>t.id===(f&&f.tipo)) || TIPOS.find(t=>t.id==='otro'); }
+function iconoDe(f){ return tipoDe(f).icon; }
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 function fmt(n){ return n.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmt0(n){ return Math.round(n).toLocaleString('es-ES'); }
@@ -782,10 +810,10 @@ function goTo(screen){
 // ════════ HOME ════════
 function patTotal(){
   const vF=(x)=>x.valorReal!=null?x.valorReal:x.aportado;
-  const fondosTotal=(settings.fondos||[]).reduce((s,f)=>{
+  // patrimonio = suma del valor de todos los destinos (TR incluido)
+  return (settings.fondos||[]).reduce((s,f)=>{
     const reg=patState.fondos[f.key]; return s+(reg?vF(reg):0);
   },0);
-  return (patState.trTotal||0) + fondosTotal;
 }
 function renderHome(){
   document.getElementById('homePatrimonio').textContent = fmt0(patTotal()) + ' €';
@@ -801,7 +829,7 @@ function calcDisponible(){
   return Math.max(0, sueldo - settings.gastosFijos - settings.gastosVar - settings.provisiones);
 }
 
-// reparte un total entre los fondos según sus porcentajes
+// reparte TODO el disponible entre los destinos según sus porcentajes
 function repartirPorPct(total){
   const fondos = settings.fondos||[];
   const sumaPct = fondos.reduce((s,f)=>s+(f.pct||0),0) || 1;
@@ -810,37 +838,23 @@ function repartirPorPct(total){
   return m;
 }
 
-function calcInvertirTotal(){
+function calcAsignadoTotal(){
   if(!calcMontos) return 0;
   return (settings.fondos||[]).reduce((s,f)=>s+(calcMontos[f.key]||0),0);
 }
 
-// al cambiar el sueldo, propone un reparto por defecto (base o lo disponible)
+// al cambiar el sueldo, propone un reparto por defecto de TODO el disponible
 function calcSueldoChanged(){
   const disp = calcDisponible();
-  calcMontos = repartirPorPct(Math.min(disp, settings.invBase));
-  const inp=document.getElementById('invertirInput');
-  if(inp && document.activeElement!==inp) inp.value=Math.round(calcInvertirTotal());
+  calcMontos = repartirPorPct(disp);
   calcRender();
 }
 
-// al escribir un total, re-reparte por porcentajes
-function calcInvertirChanged(){
-  const disp = calcDisponible();
-  let v = parseFloat(document.getElementById('invertirInput').value)||0;
-  if(v > disp){ v = disp; document.getElementById('invertirInput').value = Math.round(v); }
-  calcMontos = repartirPorPct(v);
-  calcRender();
-}
-
-// al editar el importe de UN fondo concreto
+// al editar el importe de UN destino concreto
 function calcFondoChanged(key, val){
-  if(!calcMontos) calcMontos=repartirPorPct(Math.min(calcDisponible(), settings.invBase));
+  if(!calcMontos) calcMontos=repartirPorPct(calcDisponible());
   let n=parseFloat(String(val).replace(',','.')); if(isNaN(n)||n<0) n=0;
   calcMontos[key]=n;
-  // el total invertido pasa a ser la suma de los fondos
-  const inp=document.getElementById('invertirInput');
-  if(inp && document.activeElement!==inp) inp.value=Math.round(calcInvertirTotal());
   calcRender();
 }
 
@@ -860,69 +874,74 @@ function fallbackCopy(text){
 function calcRender(){
   const sueldo = parseFloat(document.getElementById('sueldoInput').value)||0;
   const disp = calcDisponible();
-  if(calcMontos===null) calcMontos=repartirPorPct(Math.min(disp, settings.invBase));
+  if(calcMontos===null) calcMontos=repartirPorPct(disp);
 
-  const invertir = calcInvertirTotal();
-  const colchon = disp - invertir;
+  const asignado = calcAsignadoTotal();
+  const sinAsignar = disp - asignado;
 
   // Desglose sueldo
   document.getElementById('descGastos').textContent = '−'+fmt(settings.gastosFijos+settings.gastosVar)+' €';
   document.getElementById('descProv').textContent = '−'+fmt(settings.provisiones)+' €';
   document.getElementById('descDisp').textContent = fmt(disp)+' €';
 
-  // resumen invertir/colchón
-  document.getElementById('resColchon').textContent = fmt(colchon)+' €';
-  const invInput=document.getElementById('invertirInput');
-  if(invInput && document.activeElement!==invInput) invInput.value=Math.round(invertir);
-
   // barra proporcional a los importes actuales
   const fondos = settings.fondos||[];
   let barH='';
   fondos.forEach(f=>{
     const m=calcMontos[f.key]||0;
-    const pct = invertir>0 ? (m/invertir*100).toFixed(1) : 0;
+    const pct = asignado>0 ? (m/asignado*100).toFixed(1) : 0;
     barH += '<div class="bar-seg" style="width:'+pct+'%;background:'+f.color+'"></div>';
   });
   document.getElementById('calcBarra').innerHTML = barH;
 
-  // cada fondo con su importe EDITABLE
+  // cada destino con su importe EDITABLE
   let pH='';
   fondos.forEach(f=>{
     const m=calcMontos[f.key]||0;
-    const pct = invertir>0 ? Math.round(m/invertir*100) : 0;
+    const pct = asignado>0 ? Math.round(m/asignado*100) : 0;
+    const t=tipoDe(f);
     pH += '<div class="partida">';
     pH += '<div class="p-left"><div class="dot" style="background:'+f.color+'"></div>';
-    pH += '<div><div class="p-name">'+esc(f.nombre)+'</div>';
-    pH += '<button class="isin-chip" onclick="copyISIN(\''+f.isin+'\')">'+esc(f.isin)+' <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" fill="none" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>';
+    pH += '<div><div class="p-name">'+t.icon+' '+esc(f.nombre)+'</div>';
+    if(t.usaIsin && f.isin && f.isin.trim()){
+      pH += '<button class="isin-chip" onclick="copyISIN(\''+f.isin+'\')">'+esc(f.isin)+' <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" fill="none" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>';
+    }
     pH += '</div></div>';
     pH += '<div class="p-right"><div class="calc-fondo-amount"><input type="number" min="0" step="1" inputmode="decimal" value="'+Math.round(m)+'" data-fondo="'+f.key+'"><span>€</span></div><div class="p-pct">'+pct+'%</div></div>';
     pH += '</div>';
   });
   document.getElementById('calcPartidas').innerHTML = pH;
-  // enganchar inputs por fondo
   document.querySelectorAll('#calcPartidas input[data-fondo]').forEach(inp=>{
     inp.addEventListener('input', e=>calcFondoChanged(e.target.dataset.fondo, e.target.value));
   });
+
+  // sin asignar
+  const saRow=document.getElementById('sinAsignarRow');
+  const saVal=document.getElementById('sinAsignar');
+  saVal.textContent = fmt(sinAsignar)+' €';
+  saRow.classList.toggle('over', sinAsignar<0);
 
   // aviso
   let aviso='';
   if(sueldo>0 && disp===0){
     aviso='<div class="alert-box">Con este sueldo no queda margen tras gastos y provisiones.</div>';
-  } else if(invertir>disp){
-    aviso='<div class="alert-box">Estás repartiendo '+fmt0(invertir)+' € entre los fondos, más que los '+fmt0(disp)+' € disponibles. Baja algún fondo.</div>';
+  } else if(sinAsignar<0){
+    aviso='<div class="alert-box">Estás repartiendo '+fmt0(asignado)+' €, más que los '+fmt0(disp)+' € disponibles. Baja algún destino.</div>';
+  } else if(sinAsignar>0){
+    aviso='<div class="alert-box" style="color:var(--muted);background:var(--surface2)">Te quedan '+fmt0(sinAsignar)+' € sin asignar. Repártelos entre tus destinos o déjalos así.</div>';
   }
   document.getElementById('calcAviso').innerHTML = aviso;
 
   // botón confirmar
-  document.getElementById('btnConfirmarMes').disabled = !(sueldo>0 && disp>0 && invertir<=disp);
+  document.getElementById('btnConfirmarMes').disabled = !(sueldo>0 && disp>0 && sinAsignar>=0);
 }
 
 function confirmarMes(){
   const sueldo = parseFloat(document.getElementById('sueldoInput').value)||0;
   const disp = calcDisponible();
-  const invertir = calcInvertirTotal();
-  if(invertir>disp){ toast('Repartes más de lo disponible'); return; }
-  const colchon = disp - invertir;
+  const asignado = calcAsignadoTotal();
+  if(asignado>disp){ toast('Repartes más de lo disponible'); return; }
+  const sinAsignar = disp - asignado;
 
   // protección: ¿ya confirmaste este mes?
   const mk = monthKey();
@@ -932,8 +951,7 @@ function confirmarMes(){
     if(!confirm('Ya registraste '+mn+' este mes. Si confirmas otra vez, el dinero se sumará DE NUEVO al patrimonio.\n\n¿Seguro que quieres volver a confirmar?')) return;
   }
 
-  // sumar al patrimonio: lo que no inviertes va a TR, lo invertido a cada fondo
-  patState.trTotal = (patState.trTotal||0) + colchon;
+  // sumar al patrimonio: cada destino recibe su importe
   const histFondos={};
   (settings.fondos||[]).forEach(f=>{
     const monto = calcMontos[f.key]||0;
@@ -948,11 +966,11 @@ function confirmarMes(){
     id: 'mes_'+Date.now(),
     date: new Date().toISOString(),
     mes: mk,
-    sueldo, invertido: invertir, colchon,
+    sueldo, invertido: asignado, colchon: sinAsignar,
     fondos: histFondos,
   });
   saveAll();
-  toast('✓ Sumado al patrimonio: +'+fmt0(colchon+invertir)+' €');
+  toast('✓ Sumado al patrimonio: +'+fmt0(asignado)+' €');
   renderHome();
 }
 
@@ -961,9 +979,7 @@ function deshacerMes(id){
   const idx = patState.historial.findIndex(x=>x.id===id);
   if(idx<0){ toast('No encontrado'); return; }
   const x = patState.historial[idx];
-  if(!confirm('¿Deshacer este registro?\nSueldo '+fmt0(x.sueldo)+'€ · invertido '+fmt0(x.invertido)+'€ · a TR '+fmt0(x.colchon)+'€.\n\nSe restará del patrimonio.')) return;
-  patState.trTotal = (patState.trTotal||0) - (x.colchon||0);
-  if(patState.trTotal<0) patState.trTotal=0;
+  if(!confirm('¿Deshacer este registro?\nSueldo '+fmt0(x.sueldo)+'€ · repartido '+fmt0(x.invertido)+'€.\n\nSe restará del patrimonio.')) return;
   const f = x.fondos||{};
   Object.keys(f).forEach(k=>{
     if(patState.fondos[k]){
@@ -1051,32 +1067,35 @@ function renderPatrimonio(){
   // asegurar que cada fondo configurado tiene su registro en patrimonio
   (settings.fondos||[]).forEach(f=>{ if(!patState.fondos[f.key]) patState.fondos[f.key]={aportado:0,valorReal:null}; });
   const valorFondo=(key)=>patState.fondos[key]?vF(patState.fondos[key]):0;
-  const fondosTotal=(settings.fondos||[]).reduce((s,f)=>s+valorFondo(f.key),0);
-  const total = (patState.trTotal||0) + fondosTotal;
+  const total = (settings.fondos||[]).reduce((s,f)=>s+valorFondo(f.key),0);
 
   document.getElementById('patTotal').textContent = fmt(total);
 
-  // objetivos: colchón sobre lo que hay en TR; vivienda sobre el fondo 'vivienda' si existe
-  const vivVal = patState.fondos.vivienda ? vF(patState.fondos.vivienda) : 0;
-  const pctColchon = settings.objColchon>0 ? Math.min((patState.trTotal||0)/settings.objColchon*100,100) : 0;
+  // objetivos: usan el destino con rol 'ahorro' (colchón) y 'vivienda'
+  const dAhorro=(settings.fondos||[]).find(f=>f.rol==='ahorro');
+  const dVivienda=(settings.fondos||[]).find(f=>f.rol==='vivienda');
+  const ahorroVal = dAhorro ? valorFondo(dAhorro.key) : 0;
+  const vivVal = dVivienda ? valorFondo(dVivienda.key) : 0;
+  const pctColchon = settings.objColchon>0 ? Math.min(ahorroVal/settings.objColchon*100,100) : 0;
   const pctVivienda = settings.objVivienda>0 ? Math.min(vivVal/settings.objVivienda*100,100) : 0;
   document.getElementById('objColchonBar').style.width = pctColchon+'%';
-  document.getElementById('objColchonTxt').textContent = fmt0(patState.trTotal||0)+' / '+fmt0(settings.objColchon)+' € · '+Math.round(pctColchon)+'%';
+  document.getElementById('objColchonTxt').textContent = fmt0(ahorroVal)+' / '+fmt0(settings.objColchon)+' € · '+Math.round(pctColchon)+'%';
   document.getElementById('objViviendaBar').style.width = pctVivienda+'%';
   document.getElementById('objViviendaTxt').textContent = fmt0(vivVal)+' / '+fmt0(settings.objVivienda)+' € · '+Math.round(pctVivienda)+'%';
 
-  // activo 1: Trade Republic (un solo saldo, editable). Debajo, desglose informativo de lo que hay dentro.
-  let trSub='Ahorro + provisiones + retos';
-  const partes=[];
-  if(provBalance>0) partes.push('provisiones '+fmt0(provBalance)+'€');
-  if(retosTotal>0) partes.push('retos '+fmt0(retosTotal)+'€');
-  if(partes.length) trSub='Incluye '+partes.join(' · ');
-  const activos = [
-    { icon:'🏦', nombre:'Trade Republic', sub:trSub, val:(patState.trTotal||0), editable:'tr' },
-  ];
+  // activos: cada destino (TR incluido). El de ahorro muestra qué lleva dentro (provisiones/retos) como info.
+  const activos=[];
   (settings.fondos||[]).forEach((f,i)=>{
     const reg=patState.fondos[f.key];
-    activos.push({ icon:'📊', nombre:f.nombre, sub:'Aportado: '+fmt0(reg.aportado)+' €', val:vF(reg), editable:f.key, delIndex:i });
+    const t=tipoDe(f);
+    let sub = t.usaIsin ? 'Aportado: '+fmt0(reg.aportado)+' €' : t.label;
+    if(f.rol==='ahorro'){
+      const partes=[];
+      if(provBalance>0) partes.push('provisiones '+fmt0(provBalance)+'€');
+      if(retosTotal>0) partes.push('retos '+fmt0(retosTotal)+'€');
+      sub = partes.length ? 'Incluye '+partes.join(' · ') : 'Ahorro + provisiones + retos';
+    }
+    activos.push({ icon:t.icon, nombre:f.nombre, sub, val:vF(reg), editable:f.key, delIndex:i });
   });
 
   let h='';
@@ -1109,15 +1128,18 @@ function renderPatrimonio(){
 }
 
 function editActivo(key){
-  let current, label;
-  if(key==='tr'){ current=patState.trTotal||0; label='Saldo total en Trade Republic\n(el número que ves en tu app de TR)'; }
-  else { if(!patState.fondos[key]) patState.fondos[key]={aportado:0,valorReal:null}; const f=patState.fondos[key]; current=f.valorReal!=null?f.valorReal:f.aportado; label='Valor real del fondo (mira MyInvestor)'; }
+  if(!patState.fondos[key]) patState.fondos[key]={aportado:0,valorReal:null};
+  const f=patState.fondos[key];
+  const destino=(settings.fondos||[]).find(d=>d.key===key);
+  const current=f.valorReal!=null?f.valorReal:f.aportado;
+  const label=(destino && destino.rol==='ahorro')
+    ? 'Saldo real (el número que ves en tu app)'
+    : 'Valor real (míralo en tu plataforma)';
   const v = prompt(label+'\nValor actual: '+fmt(current)+' €\n\nNuevo valor:', Math.round(current));
   if(v===null) return;
   const num = parseFloat(String(v).replace(',','.'));
   if(isNaN(num)||num<0){ toast('Valor no válido'); return; }
-  if(key==='tr') patState.trTotal = num;
-  else patState.fondos[key].valorReal = num;
+  patState.fondos[key].valorReal = num;
   saveAll(); renderPatrimonio(); renderHome(); toast('✓ Actualizado');
 }
 
@@ -1234,7 +1256,6 @@ const AJUSTES_FIELDS = [
   { key:'provisiones', label:'Provisiones mensuales', sub:'Se resta en la calculadora y es la aportación por defecto en Provisiones' },
   { key:'objColchon', label:'Objetivo colchón', sub:'6 meses viviendo fuera' },
   { key:'objVivienda', label:'Objetivo vivienda', sub:'Entrada + gastos compra' },
-  { key:'invBase', label:'Inversión por defecto', sub:'Cuánto invertir por defecto cada mes (editable en la calculadora)' },
 ];
 
 function renderAjustes(){
@@ -1265,18 +1286,25 @@ function renderFondosEditor(){
   const sumaPct=fondos.reduce((s,f)=>s+(f.pct||0),0);
   let h='';
   fondos.forEach((f,i)=>{
+    const t=tipoDe(f);
     h+='<div class="fondo-edit">';
     h+='<div class="fondo-edit-top"><div class="dot" style="background:'+f.color+'"></div>';
-    h+='<input class="fondo-nombre" data-i="'+i+'" data-field="nombre" value="'+esc(f.nombre)+'" placeholder="Nombre del fondo">';
+    h+='<input class="fondo-nombre" data-i="'+i+'" data-field="nombre" value="'+esc(f.nombre)+'" placeholder="Nombre (ej. Trade Republic, S&P 500)">';
     h+='<button class="reto-mini" onclick="borrarFondo('+i+')"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button></div>';
-    h+='<div class="fondo-edit-row">';
-    h+='<input class="fondo-isin" data-i="'+i+'" data-field="isin" value="'+esc(f.isin)+'" placeholder="ISIN">';
+    // selector de tipo
+    h+='<div class="fondo-edit-row"><select class="fondo-tipo" data-i="'+i+'">';
+    TIPOS.forEach(tp=>{ h+='<option value="'+tp.id+'"'+(tp.id===t.id?' selected':'')+'>'+tp.icon+' '+tp.label+'</option>'; });
+    h+='</select>';
     h+='<div class="amount-wrap" style="flex:none"><input type="number" class="fondo-pct" data-i="'+i+'" data-field="pct" value="'+f.pct+'" min="0" max="100" style="width:52px;text-align:right"><span>%</span></div>';
     h+='</div>';
+    // ISIN solo si el tipo lo usa
+    if(t.usaIsin){
+      h+='<div class="fondo-edit-row"><input class="fondo-isin" data-i="'+i+'" data-field="isin" value="'+esc(f.isin||'')+'" placeholder="ISIN (opcional)"></div>';
+    }
     h+='</div>';
   });
   h+='<div class="fondo-suma'+(sumaPct!==100?' warn':'')+'">Suma de porcentajes: '+sumaPct+'%'+(sumaPct!==100?' (ideal 100%)':' ✓')+'</div>';
-  h+='<button class="btn-secondary" style="width:100%;margin-top:10px" onclick="nuevoFondo()">+ Añadir fondo</button>';
+  h+='<button class="btn-secondary" style="width:100%;margin-top:10px" onclick="nuevoFondo()">+ Añadir destino</button>';
   cont.innerHTML=h;
 
   cont.querySelectorAll('.fondo-nombre,.fondo-isin').forEach(inp=>{
@@ -1284,6 +1312,13 @@ function renderFondosEditor(){
       const i=+e.target.dataset.i, field=e.target.dataset.field;
       settings.fondos[i][field]=e.target.value.trim();
       saveAll(); calcRender(); renderPatrimonio(); toast('✓ Guardado');
+    });
+  });
+  cont.querySelectorAll('.fondo-tipo').forEach(sel=>{
+    sel.addEventListener('change',e=>{
+      const i=+e.target.dataset.i;
+      settings.fondos[i].tipo=e.target.value;
+      saveAll(); calcRender(); renderPatrimonio(); renderFondosEditor(); toast('✓ Guardado');
     });
   });
   cont.querySelectorAll('.fondo-pct').forEach(inp=>{
@@ -1298,14 +1333,20 @@ function renderFondosEditor(){
 
 const FONDO_COLORS=['#00d68f','#4d9fff','#9b8fff','#ffb740','#ff6b6b','#4dd0e1','#f06292'];
 function nuevoFondo(){
-  const nombre=prompt('Nombre del nuevo fondo:'); if(!nombre||!nombre.trim()) return;
-  const isin=prompt('ISIN del fondo:')||'';
-  const pct=parseFloat(prompt('¿Qué porcentaje va a este fondo?','10'))||0;
-  const key='fondo_'+Date.now();
+  const nombre=prompt('Nombre del destino (ej. Trade Republic, S&P 500, Bitcoin):'); if(!nombre||!nombre.trim()) return;
+  // elegir tipo por número
+  const lista=TIPOS.map((t,i)=>(i+1)+') '+t.icon+' '+t.label).join('\n');
+  const sel=prompt('¿Qué tipo de destino es?\n\n'+lista+'\n\nEscribe el número:','2');
+  const idx=parseInt(sel,10)-1;
+  const t=(idx>=0&&idx<TIPOS.length)?TIPOS[idx]:TIPOS.find(x=>x.id==='otro');
+  let isin='';
+  if(t.usaIsin) isin=prompt('ISIN (opcional):')||'';
+  const pct=parseFloat(prompt('¿Qué % de tu disponible va aquí por defecto?','10'))||0;
+  const key='dest_'+Date.now();
   const color=FONDO_COLORS[(settings.fondos.length)%FONDO_COLORS.length];
-  settings.fondos.push({ key, nombre:nombre.trim(), isin:isin.trim(), color, pct });
+  settings.fondos.push({ key, nombre:nombre.trim(), isin:isin.trim(), color, pct, tipo:t.id });
   patState.fondos[key]={aportado:0,valorReal:null};
-  saveAll(); renderFondosEditor(); calcRender(); renderPatrimonio(); toast('✓ Fondo añadido');
+  saveAll(); renderFondosEditor(); calcRender(); renderPatrimonio(); toast('✓ Destino añadido');
 }
 
 function borrarFondo(i){
@@ -1332,7 +1373,7 @@ function exportData(){
 
 function checkBackupReminder(){
   const banner=document.getElementById('backupBanner'); if(!banner) return;
-  const hayDatos = (patState.historial&&patState.historial.length) || (provState.movements&&provState.movements.length) || (patState.trTotal||0)>0;
+  const hayDatos = (patState.historial&&patState.historial.length) || (provState.movements&&provState.movements.length) || patTotal()>0;
   if(!hayDatos){ banner.style.display='none'; return; }
   let last=null;
   try{ last=localStorage.getItem('mystuff_last_backup'); }catch(e){}
@@ -1385,7 +1426,6 @@ try {
   document.getElementById('btnAddExpense').addEventListener('click', provExpense);
   document.getElementById('expAmount').addEventListener('keydown',e=>{ if(e.key==='Enter') provExpense(); });
   document.getElementById('sueldoInput').addEventListener('input', calcSueldoChanged);
-  document.getElementById('invertirInput').addEventListener('input', calcInvertirChanged);
   document.getElementById('btnConfirmarMes').addEventListener('click', confirmarMes);
 
   provRender();
