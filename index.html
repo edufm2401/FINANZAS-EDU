@@ -82,7 +82,8 @@ nav{position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav-h) + var(--safe
 .invertir-grid{display:flex;gap:10px;align-items:stretch;}
 .invertir-box{flex:1;background:var(--surface2);border-radius:12px;padding:13px;}
 .invertir-box .ib-label{font-size:11px;color:var(--muted);margin-bottom:6px;}
-.invertir-box input{font-family:'Space Grotesk','Inter',sans-serif;font-size:22px;font-weight:500;color:var(--text);background:transparent;border:none;outline:none;width:100%;-moz-appearance:textfield;}
+.invertir-box input{font-family:'Space Grotesk','Inter',sans-serif;font-size:22px;font-weight:500;color:var(--green);background:transparent;border:none;border-bottom:2px solid var(--border2);outline:none;width:100%;-moz-appearance:textfield;padding-bottom:2px;transition:border-color .15s;}
+.invertir-box input:focus{border-bottom-color:var(--green);}
 .invertir-box input::-webkit-outer-spin-button,.invertir-box input::-webkit-inner-spin-button{-webkit-appearance:none;}
 .invertir-box .ib-val{font-family:'Space Grotesk','Inter',sans-serif;font-size:22px;font-weight:500;color:var(--blue);}
 .invertir-box.colchon .ib-val{color:var(--green);}
@@ -98,6 +99,10 @@ nav{position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav-h) + var(--safe
 .isin-chip:active{background:var(--green-dim);color:var(--green);border-color:var(--green);}
 .p-right{text-align:right;flex-shrink:0;}
 .p-eur{font-family:'Space Grotesk','Inter',sans-serif;font-size:14px;font-weight:500;color:var(--text);}
+.calc-fondo-amount{display:inline-flex;align-items:center;gap:3px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:4px 8px;}
+.calc-fondo-amount input{font-family:'Space Grotesk','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--green);background:transparent;border:none;outline:none;width:54px;text-align:right;-moz-appearance:textfield;}
+.calc-fondo-amount input::-webkit-outer-spin-button,.calc-fondo-amount input::-webkit-inner-spin-button{-webkit-appearance:none;}
+.calc-fondo-amount span{font-family:'Space Grotesk','Inter',sans-serif;font-size:12px;color:var(--muted);}
 .p-pct{font-size:11px;color:var(--muted);margin-top:1px;}
 
 .alert-box{font-size:13px;color:var(--amber);background:var(--amber-dim);border-radius:10px;padding:10px 12px;margin-top:10px;line-height:1.5;}
@@ -452,7 +457,7 @@ nav{background:rgba(10,11,13,0.8);backdrop-filter:blur(24px) saturate(1.2);-webk
           <input type="number" id="invertirInput" value="290" min="0" step="1" inputmode="decimal"/>
         </div>
         <div class="invertir-box colchon">
-          <div class="ib-label">🛡️ Al colchón</div>
+          <div class="ib-label">🏦 A TR / ahorro</div>
           <div class="ib-val" id="resColchon">0,00 €</div>
         </div>
       </div>
@@ -461,7 +466,7 @@ nav{background:rgba(10,11,13,0.8);backdrop-filter:blur(24px) saturate(1.2);-webk
 
   <div class="section">
     <div class="card">
-      <div class="card-label">Distribución · toca el ISIN para copiarlo</div>
+      <div class="card-label">Distribución · edita el € de cada fondo · toca el ISIN para copiarlo</div>
       <div class="bar-track" id="calcBarra"></div>
       <div id="calcPartidas"></div>
       <div id="calcAviso"></div>
@@ -470,7 +475,7 @@ nav{background:rgba(10,11,13,0.8);backdrop-filter:blur(24px) saturate(1.2);-webk
 
   <div class="section">
     <button class="btn-confirm" id="btnConfirmarMes">Confirmar mes → sumar al patrimonio</button>
-    <div class="confirm-hint">Al confirmar, lo invertido se suma a cada fondo y el resto al colchón en la pestaña Patrimonio</div>
+    <div class="confirm-hint">Al confirmar, lo invertido se suma a cada fondo y el resto a tu saldo de Trade Republic, en Patrimonio</div>
   </div>
 </div>
 
@@ -566,6 +571,7 @@ nav{background:rgba(10,11,13,0.8);backdrop-filter:blur(24px) saturate(1.2);-webk
   <div class="section">
     <div class="section-label">Activos · toca ✏️ para ajustar al valor real</div>
     <div class="card" id="activosList"></div>
+    <button class="btn-secondary" style="width:100%;margin-top:10px" onclick="nuevoFondo()">+ Añadir fondo</button>
   </div>
 
   <div class="section">
@@ -723,6 +729,7 @@ if(!settings.fondos){
 if(settings.invBase==null) settings.invBase=290;
 let provState = loadJSON(KEYS.prov) || { movements: [] };
 let patState = loadJSON(KEYS.pat) || {
+  trTotal: 0,
   colchon: 0,
   fondos: {
     vivienda: { aportado: 0, valorReal: null },
@@ -733,6 +740,11 @@ let patState = loadJSON(KEYS.pat) || {
   retos: [],
 };
 if(!patState.retos) patState.retos = []; // migración para datos antiguos
+// migración a modelo "TR = un solo saldo": trTotal reúne lo que antes eran colchón + provisiones
+if(patState.trTotal===undefined){
+  const _prov = (provState.movements||[]).reduce((s,m)=>s+(m.type==='in'?m.amount:-m.amount),0);
+  patState.trTotal = (patState.colchon||0) + _prov;
+}
 
 function loadJSON(k){ try{ const r=localStorage.getItem(k); return r?JSON.parse(r):null; }catch(e){ return null; } }
 function saveJSON(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
@@ -769,10 +781,11 @@ function goTo(screen){
 
 // ════════ HOME ════════
 function patTotal(){
-  const provBalance = provState.movements.reduce((s,m)=>s+(m.type==='in'?m.amount:-m.amount),0);
-  const f=patState.fondos;
   const vF=(x)=>x.valorReal!=null?x.valorReal:x.aportado;
-  return patState.colchon + provBalance + vF(f.vivienda) + vF(f.sp500) + vF(f.msci);
+  const fondosTotal=(settings.fondos||[]).reduce((s,f)=>{
+    const reg=patState.fondos[f.key]; return s+(reg?vF(reg):0);
+  },0);
+  return (patState.trTotal||0) + fondosTotal;
 }
 function renderHome(){
   document.getElementById('homePatrimonio').textContent = fmt0(patTotal()) + ' €';
@@ -780,34 +793,55 @@ function renderHome(){
 }
 
 // ════════ CALCULADORA ════════
-let calcInvertir = null; // user-chosen amount to invest
+// calcMontos: importe elegido para cada fondo este mes (editable por fondo). null = aún no inicializado.
+let calcMontos = null;
 
 function calcDisponible(){
   const sueldo = parseFloat(document.getElementById('sueldoInput').value)||0;
   return Math.max(0, sueldo - settings.gastosFijos - settings.gastosVar - settings.provisiones);
 }
 
+// reparte un total entre los fondos según sus porcentajes
+function repartirPorPct(total){
+  const fondos = settings.fondos||[];
+  const sumaPct = fondos.reduce((s,f)=>s+(f.pct||0),0) || 1;
+  const m={};
+  fondos.forEach(f=>{ m[f.key]=Math.round(total*(f.pct||0)/sumaPct); });
+  return m;
+}
+
+function calcInvertirTotal(){
+  if(!calcMontos) return 0;
+  return (settings.fondos||[]).reduce((s,f)=>s+(calcMontos[f.key]||0),0);
+}
+
+// al cambiar el sueldo, propone un reparto por defecto (base o lo disponible)
 function calcSueldoChanged(){
   const disp = calcDisponible();
-  // por defecto invierte tu objetivo base (o todo lo que haya si es menos)
-  calcInvertir = Math.min(disp, settings.invBase);
-  document.getElementById('invertirInput').value = Math.round(calcInvertir);
+  calcMontos = repartirPorPct(Math.min(disp, settings.invBase));
+  const inp=document.getElementById('invertirInput');
+  if(inp && document.activeElement!==inp) inp.value=Math.round(calcInvertirTotal());
   calcRender();
 }
 
+// al escribir un total, re-reparte por porcentajes
 function calcInvertirChanged(){
   const disp = calcDisponible();
   let v = parseFloat(document.getElementById('invertirInput').value)||0;
   if(v > disp){ v = disp; document.getElementById('invertirInput').value = Math.round(v); }
-  calcInvertir = v;
+  calcMontos = repartirPorPct(v);
   calcRender();
 }
 
-// reparte "invertir" entre los fondos según sus porcentajes (normalizados a 100)
-function calcDistribucion(invertir){
-  const fondos = settings.fondos||[];
-  const sumaPct = fondos.reduce((s,f)=>s+(f.pct||0),0) || 1;
-  return fondos.map(f=>({ key:f.key, nombre:f.nombre, isin:f.isin, color:f.color, monto: invertir*(f.pct||0)/sumaPct }));
+// al editar el importe de UN fondo concreto
+function calcFondoChanged(key, val){
+  if(!calcMontos) calcMontos=repartirPorPct(Math.min(calcDisponible(), settings.invBase));
+  let n=parseFloat(String(val).replace(',','.')); if(isNaN(n)||n<0) n=0;
+  calcMontos[key]=n;
+  // el total invertido pasa a ser la suma de los fondos
+  const inp=document.getElementById('invertirInput');
+  if(inp && document.activeElement!==inp) inp.value=Math.round(calcInvertirTotal());
+  calcRender();
 }
 
 function copyISIN(isin){
@@ -826,16 +860,9 @@ function fallbackCopy(text){
 function calcRender(){
   const sueldo = parseFloat(document.getElementById('sueldoInput').value)||0;
   const disp = calcDisponible();
-  if(calcInvertir===null) calcSueldoChanged();
-  let invertir = Math.min(calcInvertir||0, disp);
-  // si el disponible ha bajado por debajo de lo que querías invertir,
-  // ajusta también el valor guardado y el campo visible
-  if((calcInvertir||0) > disp){
-    calcInvertir = disp;
-    invertir = disp;
-    const invInput=document.getElementById('invertirInput');
-    if(document.activeElement!==invInput) invInput.value=Math.round(disp);
-  }
+  if(calcMontos===null) calcMontos=repartirPorPct(Math.min(disp, settings.invBase));
+
+  const invertir = calcInvertirTotal();
   const colchon = disp - invertir;
 
   // Desglose sueldo
@@ -845,52 +872,57 @@ function calcRender(){
 
   // resumen invertir/colchón
   document.getElementById('resColchon').textContent = fmt(colchon)+' €';
-  document.getElementById('invertirInput').max = Math.round(disp);
+  const invInput=document.getElementById('invertirInput');
+  if(invInput && document.activeElement!==invInput) invInput.value=Math.round(invertir);
 
-  // distribución
-  const dist = calcDistribucion(invertir);
-  const totalInv = dist.reduce((a,b)=>a+b.monto,0);
-
+  // barra proporcional a los importes actuales
+  const fondos = settings.fondos||[];
   let barH='';
-  dist.forEach(d=>{
-    const pct = totalInv>0 ? (d.monto/totalInv*100).toFixed(1) : 0;
-    barH += '<div class="bar-seg" style="width:'+pct+'%;background:'+d.color+'"></div>';
+  fondos.forEach(f=>{
+    const m=calcMontos[f.key]||0;
+    const pct = invertir>0 ? (m/invertir*100).toFixed(1) : 0;
+    barH += '<div class="bar-seg" style="width:'+pct+'%;background:'+f.color+'"></div>';
   });
   document.getElementById('calcBarra').innerHTML = barH;
 
+  // cada fondo con su importe EDITABLE
   let pH='';
-  dist.forEach(d=>{
-    const pct = totalInv>0 ? Math.round(d.monto/totalInv*100) : 0;
+  fondos.forEach(f=>{
+    const m=calcMontos[f.key]||0;
+    const pct = invertir>0 ? Math.round(m/invertir*100) : 0;
     pH += '<div class="partida">';
-    pH += '<div class="p-left"><div class="dot" style="background:'+d.color+'"></div>';
-    pH += '<div><div class="p-name">'+esc(d.nombre)+'</div>';
-    pH += '<button class="isin-chip" onclick="copyISIN(\''+d.isin+'\')">'+esc(d.isin)+' <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" fill="none" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>';
+    pH += '<div class="p-left"><div class="dot" style="background:'+f.color+'"></div>';
+    pH += '<div><div class="p-name">'+esc(f.nombre)+'</div>';
+    pH += '<button class="isin-chip" onclick="copyISIN(\''+f.isin+'\')">'+esc(f.isin)+' <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" fill="none" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>';
     pH += '</div></div>';
-    pH += '<div class="p-right"><div class="p-eur">'+fmt(d.monto)+' €</div><div class="p-pct">'+pct+'%</div></div>';
+    pH += '<div class="p-right"><div class="calc-fondo-amount"><input type="number" min="0" step="1" inputmode="decimal" value="'+Math.round(m)+'" data-fondo="'+f.key+'"><span>€</span></div><div class="p-pct">'+pct+'%</div></div>';
     pH += '</div>';
   });
   document.getElementById('calcPartidas').innerHTML = pH;
+  // enganchar inputs por fondo
+  document.querySelectorAll('#calcPartidas input[data-fondo]').forEach(inp=>{
+    inp.addEventListener('input', e=>calcFondoChanged(e.target.dataset.fondo, e.target.value));
+  });
 
   // aviso
   let aviso='';
-  const sumaPct = (settings.fondos||[]).reduce((s,f)=>s+(f.pct||0),0);
   if(sueldo>0 && disp===0){
     aviso='<div class="alert-box">Con este sueldo no queda margen tras gastos y provisiones.</div>';
-  } else if(sumaPct!==100 && (settings.fondos||[]).length){
-    aviso='<div class="alert-box">Tus porcentajes suman '+sumaPct+'%. Se reparten proporcionalmente igualmente, pero puedes ajustarlos en Ajustes → Fondos para que sumen 100%.</div>';
+  } else if(invertir>disp){
+    aviso='<div class="alert-box">Estás repartiendo '+fmt0(invertir)+' € entre los fondos, más que los '+fmt0(disp)+' € disponibles. Baja algún fondo.</div>';
   }
   document.getElementById('calcAviso').innerHTML = aviso;
 
   // botón confirmar
-  document.getElementById('btnConfirmarMes').disabled = !(sueldo>0 && disp>0);
+  document.getElementById('btnConfirmarMes').disabled = !(sueldo>0 && disp>0 && invertir<=disp);
 }
 
 function confirmarMes(){
   const sueldo = parseFloat(document.getElementById('sueldoInput').value)||0;
   const disp = calcDisponible();
-  const invertir = Math.min(calcInvertir||0, disp);
+  const invertir = calcInvertirTotal();
+  if(invertir>disp){ toast('Repartes más de lo disponible'); return; }
   const colchon = disp - invertir;
-  const dist = calcDistribucion(invertir);
 
   // protección: ¿ya confirmaste este mes?
   const mk = monthKey();
@@ -900,13 +932,17 @@ function confirmarMes(){
     if(!confirm('Ya registraste '+mn+' este mes. Si confirmas otra vez, el dinero se sumará DE NUEVO al patrimonio.\n\n¿Seguro que quieres volver a confirmar?')) return;
   }
 
-  // sumar al patrimonio
-  patState.colchon += colchon;
+  // sumar al patrimonio: lo que no inviertes va a TR, lo invertido a cada fondo
+  patState.trTotal = (patState.trTotal||0) + colchon;
   const histFondos={};
-  dist.forEach(d=>{
-    if(!patState.fondos[d.key]) patState.fondos[d.key]={aportado:0,valorReal:null};
-    patState.fondos[d.key].aportado += d.monto;
-    histFondos[d.key]=d.monto;
+  (settings.fondos||[]).forEach(f=>{
+    const monto = calcMontos[f.key]||0;
+    if(monto<=0) return;
+    if(!patState.fondos[f.key]) patState.fondos[f.key]={aportado:0,valorReal:null};
+    patState.fondos[f.key].aportado += monto;
+    // si ya fijaste un valor real de mercado, la nueva aportación también lo aumenta
+    if(patState.fondos[f.key].valorReal!=null) patState.fondos[f.key].valorReal += monto;
+    histFondos[f.key]=monto;
   });
   patState.historial.push({
     id: 'mes_'+Date.now(),
@@ -916,7 +952,7 @@ function confirmarMes(){
     fondos: histFondos,
   });
   saveAll();
-  toast('✓ Mes registrado en patrimonio');
+  toast('✓ Sumado al patrimonio: +'+fmt0(colchon+invertir)+' €');
   renderHome();
 }
 
@@ -925,14 +961,18 @@ function deshacerMes(id){
   const idx = patState.historial.findIndex(x=>x.id===id);
   if(idx<0){ toast('No encontrado'); return; }
   const x = patState.historial[idx];
-  if(!confirm('¿Deshacer este registro?\nSueldo '+fmt0(x.sueldo)+'€ · invertido '+fmt0(x.invertido)+'€ · colchón '+fmt0(x.colchon)+'€.\n\nSe restará del patrimonio.')) return;
-  patState.colchon -= (x.colchon||0);
-  if(patState.colchon<0) patState.colchon=0;
+  if(!confirm('¿Deshacer este registro?\nSueldo '+fmt0(x.sueldo)+'€ · invertido '+fmt0(x.invertido)+'€ · a TR '+fmt0(x.colchon)+'€.\n\nSe restará del patrimonio.')) return;
+  patState.trTotal = (patState.trTotal||0) - (x.colchon||0);
+  if(patState.trTotal<0) patState.trTotal=0;
   const f = x.fondos||{};
   Object.keys(f).forEach(k=>{
     if(patState.fondos[k]){
       patState.fondos[k].aportado -= f[k];
       if(patState.fondos[k].aportado<0) patState.fondos[k].aportado=0;
+      if(patState.fondos[k].valorReal!=null){
+        patState.fondos[k].valorReal -= f[k];
+        if(patState.fondos[k].valorReal<0) patState.fondos[k].valorReal=0;
+      }
     }
   });
   patState.historial.splice(idx,1);
@@ -1006,32 +1046,37 @@ function provExpense(){
 // ════════ PATRIMONIO ════════
 function renderPatrimonio(){
   const provBalance = provState.movements.reduce((s,m)=>s+(m.type==='in'?m.amount:-m.amount),0);
+  const retosTotal = (patState.retos||[]).reduce((s,r)=>s+retoAhorrado(r),0);
   const vF=(x)=>x.valorReal!=null?x.valorReal:x.aportado;
   // asegurar que cada fondo configurado tiene su registro en patrimonio
   (settings.fondos||[]).forEach(f=>{ if(!patState.fondos[f.key]) patState.fondos[f.key]={aportado:0,valorReal:null}; });
   const valorFondo=(key)=>patState.fondos[key]?vF(patState.fondos[key]):0;
   const fondosTotal=(settings.fondos||[]).reduce((s,f)=>s+valorFondo(f.key),0);
-  const total = patState.colchon + provBalance + fondosTotal;
+  const total = (patState.trTotal||0) + fondosTotal;
 
   document.getElementById('patTotal').textContent = fmt(total);
 
-  // objetivos: vivienda usa el fondo con key 'vivienda' si existe
+  // objetivos: colchón sobre lo que hay en TR; vivienda sobre el fondo 'vivienda' si existe
   const vivVal = patState.fondos.vivienda ? vF(patState.fondos.vivienda) : 0;
-  const pctColchon = settings.objColchon>0 ? Math.min(patState.colchon/settings.objColchon*100,100) : 0;
+  const pctColchon = settings.objColchon>0 ? Math.min((patState.trTotal||0)/settings.objColchon*100,100) : 0;
   const pctVivienda = settings.objVivienda>0 ? Math.min(vivVal/settings.objVivienda*100,100) : 0;
   document.getElementById('objColchonBar').style.width = pctColchon+'%';
-  document.getElementById('objColchonTxt').textContent = fmt0(patState.colchon)+' / '+fmt0(settings.objColchon)+' € · '+Math.round(pctColchon)+'%';
+  document.getElementById('objColchonTxt').textContent = fmt0(patState.trTotal||0)+' / '+fmt0(settings.objColchon)+' € · '+Math.round(pctColchon)+'%';
   document.getElementById('objViviendaBar').style.width = pctVivienda+'%';
   document.getElementById('objViviendaTxt').textContent = fmt0(vivVal)+' / '+fmt0(settings.objVivienda)+' € · '+Math.round(pctVivienda)+'%';
 
-  // activos: colchón + provisiones + cada fondo configurado
+  // activo 1: Trade Republic (un solo saldo, editable). Debajo, desglose informativo de lo que hay dentro.
+  let trSub='Ahorro + provisiones + retos';
+  const partes=[];
+  if(provBalance>0) partes.push('provisiones '+fmt0(provBalance)+'€');
+  if(retosTotal>0) partes.push('retos '+fmt0(retosTotal)+'€');
+  if(partes.length) trSub='Incluye '+partes.join(' · ');
   const activos = [
-    { icon:'🛡️', nombre:'Colchón emergencia', sub:'Trade Republic', val:patState.colchon, editable:'colchon' },
-    { icon:'📦', nombre:'Provisiones', sub:'Trade Republic · auto', val:provBalance, editable:null },
+    { icon:'🏦', nombre:'Trade Republic', sub:trSub, val:(patState.trTotal||0), editable:'tr' },
   ];
-  (settings.fondos||[]).forEach(f=>{
+  (settings.fondos||[]).forEach((f,i)=>{
     const reg=patState.fondos[f.key];
-    activos.push({ icon:'📊', nombre:f.nombre, sub:'Aportado: '+fmt0(reg.aportado)+' €', val:vF(reg), editable:f.key });
+    activos.push({ icon:'📊', nombre:f.nombre, sub:'Aportado: '+fmt0(reg.aportado)+' €', val:vF(reg), editable:f.key, delIndex:i });
   });
 
   let h='';
@@ -1042,6 +1087,7 @@ function renderPatrimonio(){
     h+='<div class="mov-amount pos">'+fmt(a.val)+'€</div>';
     if(a.editable) h+='<button class="edit-btn" onclick="editActivo(\''+a.editable+'\')"><svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 3a2.85 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5z"/></svg></button>';
     else h+='<div style="width:30px"></div>';
+    if(a.delIndex!=null) h+='<button class="edit-btn" style="margin-left:6px" onclick="borrarFondo('+a.delIndex+')"><svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" fill="none" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg></button>';
     h+='</div>';
   });
   document.getElementById('activosList').innerHTML = h;
@@ -1064,13 +1110,13 @@ function renderPatrimonio(){
 
 function editActivo(key){
   let current, label;
-  if(key==='colchon'){ current=patState.colchon; label='Colchón de emergencia'; }
+  if(key==='tr'){ current=patState.trTotal||0; label='Saldo total en Trade Republic\n(el número que ves en tu app de TR)'; }
   else { if(!patState.fondos[key]) patState.fondos[key]={aportado:0,valorReal:null}; const f=patState.fondos[key]; current=f.valorReal!=null?f.valorReal:f.aportado; label='Valor real del fondo (mira MyInvestor)'; }
   const v = prompt(label+'\nValor actual: '+fmt(current)+' €\n\nNuevo valor:', Math.round(current));
   if(v===null) return;
   const num = parseFloat(String(v).replace(',','.'));
   if(isNaN(num)||num<0){ toast('Valor no válido'); return; }
-  if(key==='colchon') patState.colchon = num;
+  if(key==='tr') patState.trTotal = num;
   else patState.fondos[key].valorReal = num;
   saveAll(); renderPatrimonio(); renderHome(); toast('✓ Actualizado');
 }
@@ -1286,7 +1332,7 @@ function exportData(){
 
 function checkBackupReminder(){
   const banner=document.getElementById('backupBanner'); if(!banner) return;
-  const hayDatos = (patState.historial&&patState.historial.length) || (provState.movements&&provState.movements.length) || patState.colchon>0;
+  const hayDatos = (patState.historial&&patState.historial.length) || (provState.movements&&provState.movements.length) || (patState.trTotal||0)>0;
   if(!hayDatos){ banner.style.display='none'; return; }
   let last=null;
   try{ last=localStorage.getItem('mystuff_last_backup'); }catch(e){}
