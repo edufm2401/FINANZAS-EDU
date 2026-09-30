@@ -103,6 +103,11 @@ nav{position:fixed;bottom:0;left:0;right:0;height:calc(var(--nav-h) + var(--safe
 .calc-fondo-amount input{font-family:'Space Grotesk','Inter',sans-serif;font-size:14px;font-weight:600;color:var(--green);background:transparent;border:none;outline:none;width:54px;text-align:right;-moz-appearance:textfield;}
 .calc-fondo-amount input::-webkit-outer-spin-button,.calc-fondo-amount input::-webkit-inner-spin-button{-webkit-appearance:none;}
 .calc-fondo-amount span{font-family:'Space Grotesk','Inter',sans-serif;font-size:12px;color:var(--muted);}
+.total-repartir{display:flex;align-items:baseline;gap:6px;}
+.total-repartir input{font-family:'Space Grotesk','Inter',sans-serif;font-size:30px;font-weight:600;color:var(--green);background:transparent;border:none;border-bottom:2px solid var(--border2);outline:none;width:150px;-moz-appearance:textfield;padding-bottom:2px;transition:border-color .15s;}
+.total-repartir input:focus{border-bottom-color:var(--green);}
+.total-repartir input::-webkit-outer-spin-button,.total-repartir input::-webkit-inner-spin-button{-webkit-appearance:none;}
+.total-repartir span{font-size:22px;color:var(--muted);}
 .sinasignar-row{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--border);}
 .sa-lbl{font-size:13px;color:var(--muted);}
 .sa-val{font-family:'Space Grotesk','Inter',sans-serif;font-size:15px;font-weight:600;color:var(--text);}
@@ -456,7 +461,12 @@ nav{background:rgba(10,11,13,0.8);backdrop-filter:blur(24px) saturate(1.2);-webk
 
   <div class="section">
     <div class="card">
-      <div class="card-label">Reparte tu disponible entre tus destinos · edita el € de cada uno</div>
+      <div class="card-label">Total a repartir · se divide entre tus destinos por %</div>
+      <div class="total-repartir">
+        <input type="number" id="repartirTotal" min="0" step="1" inputmode="decimal" value="290">
+        <span>€</span>
+      </div>
+      <div class="card-label" style="margin-top:16px">Cada destino · ajusta el € que quieras</div>
       <div class="bar-track" id="calcBarra"></div>
       <div id="calcPartidas"></div>
       <div class="sinasignar-row" id="sinAsignarRow">
@@ -843,10 +853,19 @@ function calcAsignadoTotal(){
   return (settings.fondos||[]).reduce((s,f)=>s+(calcMontos[f.key]||0),0);
 }
 
-// al cambiar el sueldo, propone un reparto por defecto de TODO el disponible
+// al cambiar el sueldo, propone repartir TODO el disponible
 function calcSueldoChanged(){
   const disp = calcDisponible();
   calcMontos = repartirPorPct(disp);
+  calcRender();
+}
+
+// al escribir el TOTAL a repartir, re-reparte por porcentajes
+function calcRepartirChanged(){
+  const disp = calcDisponible();
+  let v = parseFloat(document.getElementById('repartirTotal').value)||0;
+  if(v>disp){ v=disp; document.getElementById('repartirTotal').value=Math.round(v); }
+  calcMontos = repartirPorPct(v);
   calcRender();
 }
 
@@ -883,6 +902,10 @@ function calcRender(){
   document.getElementById('descGastos').textContent = '−'+fmt(settings.gastosFijos+settings.gastosVar)+' €';
   document.getElementById('descProv').textContent = '−'+fmt(settings.provisiones)+' €';
   document.getElementById('descDisp').textContent = fmt(disp)+' €';
+
+  // total a repartir = suma de los destinos (refleja las ediciones por fondo)
+  const totalInput=document.getElementById('repartirTotal');
+  if(totalInput && document.activeElement!==totalInput) totalInput.value=Math.round(asignado);
 
   // barra proporcional a los importes actuales
   const fondos = settings.fondos||[];
@@ -1426,6 +1449,7 @@ try {
   document.getElementById('btnAddExpense').addEventListener('click', provExpense);
   document.getElementById('expAmount').addEventListener('keydown',e=>{ if(e.key==='Enter') provExpense(); });
   document.getElementById('sueldoInput').addEventListener('input', calcSueldoChanged);
+  document.getElementById('repartirTotal').addEventListener('input', calcRepartirChanged);
   document.getElementById('btnConfirmarMes').addEventListener('click', confirmarMes);
 
   provRender();
