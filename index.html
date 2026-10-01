@@ -448,7 +448,7 @@ nav{background:rgba(10,11,13,0.8);backdrop-filter:blur(24px) saturate(1.2);-webk
     <div class="card hero-card">
       <div class="card-label">¿Cuánto has ingresado este mes?</div>
       <div class="big-input-wrap">
-        <input type="number" id="sueldoInput" value="837" min="0" step="1" inputmode="decimal"/>
+        <input type="text" id="sueldoInput" value="837" inputmode="decimal"/>
         <span class="sym">€</span>
       </div>
       <div class="desglose">
@@ -463,7 +463,7 @@ nav{background:rgba(10,11,13,0.8);backdrop-filter:blur(24px) saturate(1.2);-webk
     <div class="card">
       <div class="card-label">Total a repartir · se divide entre tus destinos por %</div>
       <div class="total-repartir">
-        <input type="number" id="repartirTotal" min="0" step="1" inputmode="decimal" value="290">
+        <input type="text" id="repartirTotal" inputmode="decimal" value="290">
         <span>€</span>
       </div>
       <div class="card-label" style="margin-top:16px">Cada destino · ajusta el € que quieras</div>
@@ -771,6 +771,18 @@ if(!settings.destinosMigrado){
 }
 // asegurar tipo en cualquier destino que no lo tenga
 (settings.fondos||[]).forEach(f=>{ if(!f.tipo) f.tipo = (f.isin&&f.isin.trim())?'fondo':'ahorro'; });
+// migración: provisiones pasan a contar como línea viva del patrimonio.
+// Antes estaban dentro del saldo de TR → se lo restamos una vez para no contarlas dos veces.
+if(!settings.provisionesSeparadas){
+  settings.provisionesSeparadas = true;
+  const _prov = (provState.movements||[]).reduce((s,m)=>s+(m.type==='in'?m.amount:-m.amount),0);
+  const dAhorro=(settings.fondos||[]).find(f=>f.rol==='ahorro');
+  if(dAhorro && _prov>0 && patState.fondos[dAhorro.key]){
+    const reg=patState.fondos[dAhorro.key];
+    if(reg.valorReal!=null) reg.valorReal=Math.max(0,reg.valorReal-_prov);
+    else reg.aportado=Math.max(0,(reg.aportado||0)-_prov);
+  }
+}
 
 function loadJSON(k){ try{ const r=localStorage.getItem(k); return r?JSON.parse(r):null; }catch(e){ return null; } }
 function saveJSON(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
@@ -818,12 +830,16 @@ function goTo(screen){
 }
 
 // ════════ HOME ════════
+function provBalanceCalc(){
+  return (provState.movements||[]).reduce((s,m)=>s+(m.type==='in'?m.amount:-m.amount),0);
+}
 function patTotal(){
   const vF=(x)=>x.valorReal!=null?x.valorReal:x.aportado;
-  // patrimonio = suma del valor de todos los destinos (TR incluido)
-  return (settings.fondos||[]).reduce((s,f)=>{
+  // patrimonio = suma de los destinos + provisiones (vivas, se mueven con la pestaña Provisiones)
+  const destinos = (settings.fondos||[]).reduce((s,f)=>{
     const reg=patState.fondos[f.key]; return s+(reg?vF(reg):0);
   },0);
+  return destinos + provBalanceCalc();
 }
 function renderHome(){
   document.getElementById('homePatrimonio').textContent = fmt0(patTotal()) + ' €';
@@ -835,7 +851,7 @@ function renderHome(){
 let calcMontos = null;
 
 function calcDisponible(){
-  const sueldo = parseFloat(document.getElementById('sueldoInput').value)||0;
+  const sueldo = calcParse(document.getElementById('sueldoInput').value);
   return Math.max(0, sueldo - settings.gastosFijos - settings.gastosVar - settings.provisiones);
 }
 
@@ -853,28 +869,37 @@ function calcAsignadoTotal(){
   return (settings.fondos||[]).reduce((s,f)=>s+(calcMontos[f.key]||0),0);
 }
 
+function calcParse(v){ let n=parseFloat(String(v).replace(',','.')); return (isNaN(n)||n<0)?0:n; }
+
 // al cambiar el sueldo, propone repartir TODO el disponible
 function calcSueldoChanged(){
-  const disp = calcDisponible();
-  calcMontos = repartirPorPct(disp);
-  calcRender();
+  calcMontos = repartirPorPct(calcDisponible());
+  calcRenderFull();
 }
 
-// al escribir el TOTAL a repartir, re-reparte por porcentajes
+// al escribir el TOTAL a repartir, re-reparte por porcentajes (sin reconstruir la lista)
 function calcRepartirChanged(){
   const disp = calcDisponible();
-  let v = parseFloat(document.getElementById('repartirTotal').value)||0;
-  if(v>disp){ v=disp; document.getElementById('repartirTotal').value=Math.round(v); }
+  let v = calcParse(document.getElementById('repartirTotal').value);
+  if(v>disp) v=disp;
   calcMontos = repartirPorPct(v);
-  calcRender();
+  calcSyncFundInputs();   // actualiza los € de cada fondo sin recrearlos
+  calcLightUpdate();
 }
 
-// al editar el importe de UN destino concreto
+// al editar el importe de UN destino concreto (NO reconstruye: no se pierde el foco)
 function calcFondoChanged(key, val){
   if(!calcMontos) calcMontos=repartirPorPct(calcDisponible());
-  let n=parseFloat(String(val).replace(',','.')); if(isNaN(n)||n<0) n=0;
-  calcMontos[key]=n;
-  calcRender();
+  calcMontos[key]=calcParse(val);
+  calcLightUpdate();
+}
+
+// pone en cada input de fondo su importe actual (sin recrear el input, respetando el foco)
+function calcSyncFundInputs(){
+  (settings.fondos||[]).forEach(f=>{
+    const inp=document.querySelector('#calcPartidas input[data-fondo="'+f.key+'"]');
+    if(inp && document.activeElement!==inp) inp.value=Math.round(calcMontos[f.key]||0);
+  });
 }
 
 function copyISIN(isin){
@@ -890,34 +915,16 @@ function fallbackCopy(text){
   toast('ISIN copiado: '+text);
 }
 
-function calcRender(){
-  const sueldo = parseFloat(document.getElementById('sueldoInput').value)||0;
+// alias: cuando se entra a la pantalla o cambia la estructura, reconstruir
+function calcRender(){ calcRenderFull(); }
+
+// CONSTRUYE la lista de destinos (crea los inputs). Solo cuando cambia la estructura.
+function calcRenderFull(){
   const disp = calcDisponible();
   if(calcMontos===null) calcMontos=repartirPorPct(disp);
-
   const asignado = calcAsignadoTotal();
-  const sinAsignar = disp - asignado;
 
-  // Desglose sueldo
-  document.getElementById('descGastos').textContent = '−'+fmt(settings.gastosFijos+settings.gastosVar)+' €';
-  document.getElementById('descProv').textContent = '−'+fmt(settings.provisiones)+' €';
-  document.getElementById('descDisp').textContent = fmt(disp)+' €';
-
-  // total a repartir = suma de los destinos (refleja las ediciones por fondo)
-  const totalInput=document.getElementById('repartirTotal');
-  if(totalInput && document.activeElement!==totalInput) totalInput.value=Math.round(asignado);
-
-  // barra proporcional a los importes actuales
   const fondos = settings.fondos||[];
-  let barH='';
-  fondos.forEach(f=>{
-    const m=calcMontos[f.key]||0;
-    const pct = asignado>0 ? (m/asignado*100).toFixed(1) : 0;
-    barH += '<div class="bar-seg" style="width:'+pct+'%;background:'+f.color+'"></div>';
-  });
-  document.getElementById('calcBarra').innerHTML = barH;
-
-  // cada destino con su importe EDITABLE
   let pH='';
   fondos.forEach(f=>{
     const m=calcMontos[f.key]||0;
@@ -930,7 +937,7 @@ function calcRender(){
       pH += '<button class="isin-chip" onclick="copyISIN(\''+f.isin+'\')">'+esc(f.isin)+' <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" fill="none" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg></button>';
     }
     pH += '</div></div>';
-    pH += '<div class="p-right"><div class="calc-fondo-amount"><input type="number" min="0" step="1" inputmode="decimal" value="'+Math.round(m)+'" data-fondo="'+f.key+'"><span>€</span></div><div class="p-pct">'+pct+'%</div></div>';
+    pH += '<div class="p-right"><div class="calc-fondo-amount"><input type="text" inputmode="decimal" value="'+Math.round(m)+'" data-fondo="'+f.key+'"><span>€</span></div><div class="p-pct" id="pctspan_'+f.key+'">'+pct+'%</div></div>';
     pH += '</div>';
   });
   document.getElementById('calcPartidas').innerHTML = pH;
@@ -938,10 +945,44 @@ function calcRender(){
     inp.addEventListener('input', e=>calcFondoChanged(e.target.dataset.fondo, e.target.value));
   });
 
+  calcLightUpdate();
+}
+
+// ACTUALIZA solo cifras/barra/% (NO recrea inputs → el teclado no se cierra)
+function calcLightUpdate(){
+  const sueldo = calcParse(document.getElementById('sueldoInput').value);
+  const disp = calcDisponible();
+  const asignado = calcAsignadoTotal();
+  const sinAsignar = disp - asignado;
+  const fondos = settings.fondos||[];
+
+  // desglose
+  document.getElementById('descGastos').textContent = '−'+fmt(settings.gastosFijos+settings.gastosVar)+' €';
+  document.getElementById('descProv').textContent = '−'+fmt(settings.provisiones)+' €';
+  document.getElementById('descDisp').textContent = fmt(disp)+' €';
+
+  // total a repartir (solo si no lo estás escribiendo)
+  const totalInput=document.getElementById('repartirTotal');
+  if(totalInput && document.activeElement!==totalInput) totalInput.value=Math.round(asignado);
+
+  // barra (no contiene inputs, se puede reconstruir)
+  let barH='';
+  fondos.forEach(f=>{
+    const m=calcMontos[f.key]||0;
+    const pct = asignado>0 ? (m/asignado*100).toFixed(1) : 0;
+    barH += '<div class="bar-seg" style="width:'+pct+'%;background:'+f.color+'"></div>';
+  });
+  document.getElementById('calcBarra').innerHTML = barH;
+
+  // porcentajes por fondo (actualiza el span, sin tocar el input)
+  fondos.forEach(f=>{
+    const span=document.getElementById('pctspan_'+f.key);
+    if(span){ const m=calcMontos[f.key]||0; span.textContent=(asignado>0?Math.round(m/asignado*100):0)+'%'; }
+  });
+
   // sin asignar
   const saRow=document.getElementById('sinAsignarRow');
-  const saVal=document.getElementById('sinAsignar');
-  saVal.textContent = fmt(sinAsignar)+' €';
+  document.getElementById('sinAsignar').textContent = fmt(sinAsignar)+' €';
   saRow.classList.toggle('over', sinAsignar<0);
 
   // aviso
@@ -955,12 +996,11 @@ function calcRender(){
   }
   document.getElementById('calcAviso').innerHTML = aviso;
 
-  // botón confirmar
   document.getElementById('btnConfirmarMes').disabled = !(sueldo>0 && disp>0 && sinAsignar>=0);
 }
 
 function confirmarMes(){
-  const sueldo = parseFloat(document.getElementById('sueldoInput').value)||0;
+  const sueldo = calcParse(document.getElementById('sueldoInput').value);
   const disp = calcDisponible();
   const asignado = calcAsignadoTotal();
   if(asignado>disp){ toast('Repartes más de lo disponible'); return; }
@@ -1054,7 +1094,7 @@ function provRender(){
   list.querySelectorAll('.mov-delete').forEach(b=>{
     b.addEventListener('click',e=>{
       provState.movements=provState.movements.filter(m=>m.id!==e.target.closest('button').dataset.id);
-      saveAll(); provRender(); toast('Movimiento eliminado');
+      saveAll(); provRender(); renderPatrimonio(); renderHome(); toast('Movimiento eliminado');
     });
   });
 }
@@ -1067,7 +1107,7 @@ function provAdd(){
     desc:'Aportación '+MESES[new Date().getMonth()], icon:'💰',
     amount, date:new Date().toISOString(), monthKey:monthKey(),
   });
-  saveAll(); provRender(); toast('+'+fmt(amount)+'€ aportados');
+  saveAll(); provRender(); renderPatrimonio(); renderHome(); toast('+'+fmt(amount)+'€ aportados');
 }
 
 function provExpense(){
@@ -1079,7 +1119,7 @@ function provExpense(){
   provState.movements.push({ id:'mov_'+Date.now(), type:'out', desc, icon, amount, date:new Date().toISOString() });
   document.getElementById('expDesc').value='';
   document.getElementById('expAmount').value='';
-  saveAll(); provRender(); toast('−'+fmt(amount)+'€ registrados');
+  saveAll(); provRender(); renderPatrimonio(); renderHome(); toast('−'+fmt(amount)+'€ registrados');
 }
 
 // ════════ PATRIMONIO ════════
@@ -1090,7 +1130,7 @@ function renderPatrimonio(){
   // asegurar que cada fondo configurado tiene su registro en patrimonio
   (settings.fondos||[]).forEach(f=>{ if(!patState.fondos[f.key]) patState.fondos[f.key]={aportado:0,valorReal:null}; });
   const valorFondo=(key)=>patState.fondos[key]?vF(patState.fondos[key]):0;
-  const total = (settings.fondos||[]).reduce((s,f)=>s+valorFondo(f.key),0);
+  const total = (settings.fondos||[]).reduce((s,f)=>s+valorFondo(f.key),0) + provBalance;
 
   document.getElementById('patTotal').textContent = fmt(total);
 
@@ -1106,20 +1146,19 @@ function renderPatrimonio(){
   document.getElementById('objViviendaBar').style.width = pctVivienda+'%';
   document.getElementById('objViviendaTxt').textContent = fmt0(vivVal)+' / '+fmt0(settings.objVivienda)+' € · '+Math.round(pctVivienda)+'%';
 
-  // activos: cada destino (TR incluido). El de ahorro muestra qué lleva dentro (provisiones/retos) como info.
+  // activos: cada destino + Provisiones (línea viva, se actualiza sola con la pestaña Provisiones)
   const activos=[];
   (settings.fondos||[]).forEach((f,i)=>{
     const reg=patState.fondos[f.key];
     const t=tipoDe(f);
     let sub = t.usaIsin ? 'Aportado: '+fmt0(reg.aportado)+' €' : t.label;
     if(f.rol==='ahorro'){
-      const partes=[];
-      if(provBalance>0) partes.push('provisiones '+fmt0(provBalance)+'€');
-      if(retosTotal>0) partes.push('retos '+fmt0(retosTotal)+'€');
-      sub = partes.length ? 'Incluye '+partes.join(' · ') : 'Ahorro + provisiones + retos';
+      sub = retosTotal>0 ? 'Ahorro / colchón · incluye retos '+fmt0(retosTotal)+'€' : 'Ahorro / colchón';
     }
     activos.push({ icon:t.icon, nombre:f.nombre, sub, val:vF(reg), editable:f.key, delIndex:i });
   });
+  // Provisiones como línea viva (no editable ni borrable: sale de la pestaña Provisiones)
+  activos.push({ icon:'📦', nombre:'Provisiones', sub:'Se actualiza desde la pestaña Provisiones', val:provBalance, editable:null, delIndex:null });
 
   let h='';
   activos.forEach(a=>{
